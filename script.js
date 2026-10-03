@@ -78,11 +78,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // 4. SINCRONIZACIÓN CON FIREBASE O LOCAL (CORREGIDA PARA FILTROS)
+    // 4. SINCRONIZACIÓN CON FIREBASE O LOCAL
     // ==========================================
     const guardarNube = () => {
         if (MODO_PRUEBA) {
-            console.log("💻 MODO PRUEBA ACTIVO: Guardando en LocalStorage, no en Firebase.");
             localStorage.setItem('streamingMundialData', JSON.stringify({ cuentas, clientes, historialPagos, costosProveedores }));
             return;
         }
@@ -99,12 +98,10 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const escucharNubeEnTiempoReal = () => {
-        // Función auxiliar para refrescar manteniendo los filtros activos
         const refrescarVistasConFiltroActual = () => {
             actualizarDashboard();
             renderizarVistaCostos();
 
-            // Respetar filtro activo de Cuentas Madre
             const filtroCuentasActivo = document.querySelector('#vista-cuentas .btn-filtro.active');
             const valFiltroCuentas = filtroCuentasActivo ? filtroCuentasActivo.getAttribute('data-filtro') : 'Todas';
             const textoBusqCuentas = document.getElementById('buscador-cuentas')?.value || '';
@@ -114,14 +111,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderizarCuentas(valFiltroCuentas === 'Todas' ? '' : valFiltroCuentas);
             }
 
-            // Respetar filtro activo de Clientes
             const filtroClientesActivo = document.querySelector('#vista-clientes .btn-filtro.active');
             const valFiltroClientes = filtroClientesActivo ? filtroClientesActivo.getAttribute('data-filtro') : 'todos';
             renderizarClientes(valFiltroClientes);
         };
 
         if (MODO_PRUEBA) {
-            console.log("💻 MODO PRUEBA ACTIVO: Leyendo de LocalStorage.");
             const localData = JSON.parse(localStorage.getItem('streamingMundialData'));
             if (localData) {
                 cuentas = localData.cuentas || [];
@@ -166,13 +161,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // ==========================================
-    // 6. VERIFICACIÓN DE VENCIMIENTOS (HOY Y MAÑANA)
+    // 6. VERIFICACIÓN DE VENCIMIENTOS
     // ==========================================
     const verificarVencimientosClientes = () => {
         const ahora = new Date();
-        // Inicio del día de hoy (00:00:00)
         const inicioHoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()).getTime();
-        // Fin del día de mañana (23:59:59)
         const finMañana = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate() + 1, 23, 59, 59, 999).getTime();
 
         let actualizado = false;
@@ -181,9 +174,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let nuevoEstado = 'aldia';
             if (c.fechaVencimiento < inicioHoy) {
-                nuevoEstado = 'moroso'; // Ya venció
+                nuevoEstado = 'moroso';
             } else if (c.fechaVencimiento <= finMañana) {
-                nuevoEstado = 'vence-hoy'; // Vence hoy o mañana
+                nuevoEstado = 'vence-hoy';
             } else {
                 nuevoEstado = 'aldia';
             }
@@ -199,7 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const verificarVencimientosCuentas = () => {
         const hoy = new Date();
         const hoyInicio = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()).getTime();
-        const limiteAviso = hoyInicio + (2 * 24 * 60 * 60 * 1000); // 2 días de aviso
+        const limiteAviso = hoyInicio + (2 * 24 * 60 * 60 * 1000);
 
         let actualizado = false;
         cuentas.forEach(c => {
@@ -217,9 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (actualizado) guardarNube();
     };
 
-    // ==========================================
-    // AVISO AUTOMÁTICO AL ENTRAR (MODAL CENTRAL)
-    // ==========================================
+    // AVISO AUTOMÁTICO AL ENTRAR
     let alertaInicioMostrada = false;
 
     const mostrarModalAvisoHoy = (clientesHoy) => {
@@ -263,7 +254,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const mesHoy = hoy.getMonth();
         const diaHoy = hoy.getDate();
 
-        // Filtramos estrictamente a los clientes que vencen HOY para la alerta de inicio
         const clientesHoy = clientes.filter(c => {
             if (!c.fechaVencimiento) return false;
             const f = new Date(c.fechaVencimiento);
@@ -303,6 +293,8 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (c.servicioPlataforma === 'CapCut') { icon = 'fa-solid fa-video'; }
         else if (c.servicioPlataforma === 'Amazon Prime') { icon = 'fa-brands fa-amazon'; }
         else if (c.servicioPlataforma === 'IPTV') { icon = 'fa-solid fa-satellite-dish'; }
+        else if (c.servicioPlataforma === 'ViX') { icon = 'fa-solid fa-video'; }
+        else if (c.servicioPlataforma === 'Paramount+') { icon = 'fa-solid fa-mountain'; }
 
         let fechaTexto = 'Sin Fecha';
         if (c.fechaVencimiento) {
@@ -387,7 +379,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderizarDashboardServicios();
         renderizarReportesFinancieros(totalEsperado);
         
-        // RENDERIZAR CLIENTES QUE VENCEN HOY O MAÑANA
         const contVenceHoy = document.getElementById('contenedor-vence-hoy');
         const sectionVenceHoy = document.getElementById('section-vence-hoy');
         if (contVenceHoy && sectionVenceHoy) {
@@ -401,7 +392,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // RENDERIZAR CUENTAS MADRE POR VENCER
         const contCuentasVencen = document.getElementById('contenedor-cuentas-vencen');
         const sectionCuentasVencen = document.getElementById('section-cuentas-vencen');
         if (contCuentasVencen && sectionCuentasVencen) {
@@ -435,7 +425,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Llamamos al modal de inicio aquí
         verificarAlertasAlEntrar();
     };
 
@@ -543,7 +532,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 { nombre: 'Canva', color: '#7D2AE8', icono: 'fa-solid fa-palette' },
                 { nombre: 'CapCut', color: '#00F2FE', icono: 'fa-solid fa-video' },
                 { nombre: 'Amazon Prime', color: '#00A8E1', icono: 'fa-brands fa-amazon' },
-                { nombre: 'IPTV', color: '#14B8A6', icono: 'fa-solid fa-satellite-dish' }
+                { nombre: 'IPTV', color: '#14B8A6', icono: 'fa-solid fa-satellite-dish' },
+                { nombre: 'ViX', color: '#FF1A75', icono: 'fa-solid fa-video' },
+                { nombre: 'Paramount+', color: '#0064FF', icono: 'fa-solid fa-mountain' }
             ];
 
             let htmlPlat = '';
@@ -597,7 +588,9 @@ document.addEventListener('DOMContentLoaded', () => {
             { nombre: 'Canva', color: '#7D2AE8', icono: 'fa-solid fa-palette' },
             { nombre: 'CapCut', color: '#00F2FE', icono: 'fa-solid fa-video' },
             { nombre: 'Amazon Prime', color: '#00A8E1', icono: 'fa-brands fa-amazon' },
-            { nombre: 'IPTV', color: '#14B8A6', icono: 'fa-solid fa-satellite-dish' }
+            { nombre: 'IPTV', color: '#14B8A6', icono: 'fa-solid fa-satellite-dish' },
+            { nombre: 'ViX', color: '#FF1A75', icono: 'fa-solid fa-video' },
+            { nombre: 'Paramount+', color: '#0064FF', icono: 'fa-solid fa-mountain' }
         ];
 
         serviciosDef.forEach(serv => {
@@ -626,7 +619,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     // 11. GESTIÓN DE CUENTAS MADRE
     // ==========================================
-
     const guardarYRenderizarCuentas = () => {
         guardarNube();
         
@@ -725,13 +717,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Agregar Cuenta Madre
     const modalAgregarId = 'modal-agregar-cuenta';
     const formAgregarCuenta = document.getElementById('form-agregar-cuenta');
     document.getElementById('btn-agregar-cuenta')?.addEventListener('click', () => toggleModal(modalAgregarId, true));
     document.getElementById('cerrar-modal-agregar')?.addEventListener('click', () => toggleModal(modalAgregarId, false));
     
-    // LÓGICA PARA FORZAR 1 PERFIL EN SPOTIFY PERSONAL
     const selectNuevoPlat = document.getElementById('nuevo-plataforma');
     const inputNuevoPerfiles = document.getElementById('nuevo-perfiles');
     if(selectNuevoPlat && inputNuevoPerfiles) {
@@ -751,9 +741,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const inputCorreoObj = document.getElementById('nuevo-correo');
             const correoGuardado = inputCorreoObj ? inputCorreoObj.value.trim() : 'Sin Correo';
             const plataforma = document.getElementById('nuevo-plataforma').value;
-            const estadoInicial = document.getElementById('nuevo-estado')?.value || 'aldia'; // Corrección Estado
+            const estadoInicial = document.getElementById('nuevo-estado')?.value || 'aldia';
             
-            // Forzar máximo de perfiles si es Personal
             let perfilesMax = parseInt(document.getElementById('nuevo-perfiles').value) || 5;
             if (plataforma === 'Spotify Personal') perfilesMax = 1; 
 
@@ -774,6 +763,8 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (plataforma === 'CapCut') { icono = 'fa-solid fa-video'; color = '#00F2FE'; }
             else if (plataforma === 'Amazon Prime') { icono = 'fa-brands fa-amazon'; color = '#00A8E1'; }
             else if (plataforma === 'IPTV') { icono = 'fa-solid fa-satellite-dish'; color = '#14B8A6'; }
+            else if (plataforma === 'ViX') { icono = 'fa-solid fa-video'; color = '#FF1A75'; }
+            else if (plataforma === 'Paramount+') { icono = 'fa-solid fa-mountain'; color = '#0064FF'; }
 
             const subcuentasIniciales = [];
             for (let i = 0; i < perfilesMax; i++) subcuentasIniciales.push({ nombre: '', correoPerfil: '' });
@@ -781,19 +772,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const nuevaCuenta = {
                 id: Date.now(), plataforma: plataforma, icono: icono, color: color,
                 correo: correoGuardado, perfilesMax: perfilesMax, perfilesOcupados: 0,
-                estado: estadoInicial, // Agregado aquí
+                estado: estadoInicial,
                 fechaVencimiento: fechaManual, subcuentas: subcuentasIniciales
             };
 
             cuentas.push(nuevaCuenta);
-            guardarYRenderizarCuentas(); // Corrección: Llamada a la función ya existente
+            guardarYRenderizarCuentas(); 
             toggleModal(modalAgregarId, false);
             formAgregarCuenta.reset();
             mostrarNotificacion('¡Cuenta Madre guardada con éxito!');
         });
     }
 
-    // Eliminar Cuenta Madre
     let cuentaAEliminar = null;
     const modalEliminarId = 'modal-eliminar';
     window.abrirModalEliminar = function(id) { cuentaAEliminar = id; toggleModal(modalEliminarId, true); };
@@ -807,7 +797,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Subcuentas (Perfiles)
     let cuentaEnEdicionId = null;
     const modalSubId = 'modal-subcuentas';
     document.getElementById('cerrar-modal-sub')?.addEventListener('click', () => toggleModal(modalSubId, false));
@@ -874,7 +863,6 @@ document.addEventListener('DOMContentLoaded', () => {
         mostrarNotificacion('Perfiles actualizados', 'success');
     });
 
-    // Editar Cuenta Madre
     const modalEditarCuentaId = 'modal-editar-cuenta';
     const formEditarCuenta = document.getElementById('form-editar-cuenta');
     document.getElementById('cerrar-modal-editar-cuenta')?.addEventListener('click', () => toggleModal(modalEditarCuentaId, false));
@@ -1012,7 +1000,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // LÓGICA DINÁMICA DE PLATAFORMA 
     const selectPlataforma = document.getElementById('cliente-plataforma');
     const grupoCorreoPersonal = document.getElementById('grupo-correo-personal');
     const grupoEnlaceIptv = document.getElementById('grupo-enlace-iptv'); 
@@ -1022,7 +1009,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const adaptarFormularioSegunPlataforma = (platVal) => {
         if (!inputContrasena || !inputCorreoBase) return;
 
-        // Ocultar los campos extra por defecto
         if (grupoCorreoPersonal) grupoCorreoPersonal.style.display = 'none';
         if (grupoEnlaceIptv) grupoEnlaceIptv.style.display = 'none';
         
@@ -1056,7 +1042,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Modal Cliente: Abrir para Crear
     const modalClienteId = 'modal-cliente';
     const formCliente = document.getElementById('form-cliente');
     
@@ -1078,7 +1063,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('cerrar-modal-cliente')?.addEventListener('click', () => toggleModal(modalClienteId, false));
 
-    // Modal Cliente: Abrir para Editar
     window.abrirModalCliente = function(id) {
         const cliente = clientes.find(c => c.id === id);
         if (!cliente) return;
@@ -1115,7 +1099,6 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleModal(modalClienteId, true);
     };
 
-    // Guardar Cliente
     if (formCliente) {
         formCliente.addEventListener('submit', (e) => {
             e.preventDefault();
@@ -1198,7 +1181,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Eliminar Cliente
     let clienteAEliminarId = null;
     const modalEliminarClienteId = 'modal-eliminar-cliente';
     window.eliminarCliente = function(id) { clienteAEliminarId = id; toggleModal(modalEliminarClienteId, true); };
@@ -1214,7 +1196,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Renovar Pago de Cliente
     let clientePagoId = null;
     const modalPagoId = 'modal-pago';
     window.abrirModalPago = function(id) { clientePagoId = id; toggleModal(modalPagoId, true); };
@@ -1240,7 +1221,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Enviar Recordatorio
     window.enviarRecordatorio = function(id) {
         const index = clientes.findIndex(c => c.id === id);
         if (index > -1) {
@@ -1264,7 +1244,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const contenedor = document.getElementById('contenedor-costos');
         if (!contenedor) return;
         
-        const plataformas = ['Netflix', 'Max', 'Spotify Familiar', 'Spotify Personal', 'Disney+', 'Crunchyroll', 'YouTube Premium', 'Canva', 'CapCut', 'Amazon Prime', 'IPTV'];
+        const plataformas = ['Netflix', 'Max', 'Spotify Familiar', 'Spotify Personal', 'Disney+', 'Crunchyroll', 'YouTube Premium', 'Canva', 'CapCut', 'Amazon Prime', 'IPTV', 'ViX', 'Paramount+'];
         contenedor.innerHTML = '';
         
         contenedor.style.display = 'grid';
@@ -1295,6 +1275,5 @@ document.addEventListener('DOMContentLoaded', () => {
         mostrarNotificacion('Costos guardados y calculados', 'success');
     });
 
-    // Arrancar la escucha en tiempo real (o lectura local)
     escucharNubeEnTiempoReal();
 });
