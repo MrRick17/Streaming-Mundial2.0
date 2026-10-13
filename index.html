@@ -103,6 +103,7 @@
                 <button class="btn-filtro" data-filtro="IPTV" type="button"><i class="fa-solid fa-satellite-dish plat-iptv"></i> IPTV</button>
                 <button class="btn-filtro" data-filtro="ViX" type="button"><i class="fa-solid fa-video plat-vix"></i> ViX</button>
                 <button class="btn-filtro" data-filtro="Paramount+" type="button"><i class="fa-solid fa-mountain plat-paramount"></i> Paramount+</button>
+                <button class="btn-filtro" data-filtro="Gemini" type="button"><i class="fa-solid fa-sparkles plat-gemini"></i> Gemini</button>
             </div>
 
             <div class="grupo-cuentas">
@@ -260,6 +261,7 @@
                                 <option value="IPTV">IPTV</option>
                                 <option value="ViX">ViX</option>
                                 <option value="Paramount+">Paramount+</option>
+                                <option value="Gemini">Gemini</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -354,6 +356,7 @@
                             </div>
                         </div>
 
+                        <!-- NUEVA FILA DE ESTADO Y DURACIÓN -->
                         <div class="form-group-row">
                             <div class="form-group flex-1">
                                 <label>Estado</label>
@@ -366,19 +369,33 @@
                                 </div>
                             </div>
                             <div class="form-group flex-1">
+                                <label>Duración</label>
+                                <div class="input-icon-wrapper">
+                                    <i class="fa-solid fa-hourglass-half"></i>
+                                    <select id="cliente-duracion">
+                                        <option value="1m">1 Mes</option>
+                                        <option value="3m">3 Meses</option>
+                                        <option value="6m">6 Meses</option>
+                                        <option value="1y">1 Año</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group-row">
+                            <div class="form-group flex-1">
                                 <label>Vencimiento</label>
                                 <div class="input-icon-wrapper">
                                     <i class="fa-regular fa-calendar-days"></i>
                                     <input type="date" id="cliente-fecha-vencimiento" required>
                                 </div>
                             </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Monto Pagado ($)</label>
-                            <div class="input-icon-wrapper">
-                                <i class="fa-solid fa-money-bill-wave"></i>
-                                <input type="number" id="cliente-monto" placeholder="Ej. 10" step="0.01" min="0" required>
+                            <div class="form-group flex-1">
+                                <label>Monto Pagado ($)</label>
+                                <div class="input-icon-wrapper">
+                                    <i class="fa-solid fa-money-bill-wave"></i>
+                                    <input type="number" id="cliente-monto" placeholder="Ej. 10" step="0.01" min="0" required>
+                                </div>
                             </div>
                         </div>
 
@@ -403,6 +420,7 @@
                                     <option value="IPTV">IPTV</option>
                                     <option value="ViX">ViX</option>
                                     <option value="Paramount+">Paramount+</option>
+                                    <option value="Gemini">Gemini</option>
                                 </select>
                             </div>
                             <div class="input-icon-wrapper mb-2">
@@ -444,6 +462,21 @@
                 <div class="modal-box__success-icon"><i class="fa-solid fa-circle-check"></i></div>
                 <h3 class="modal-box__title">¿Registrar Pago?</h3>
                 <p class="modal-box__text">El cliente pasará a estado "Al Día" y se anotará el ingreso en tu reporte mensual.</p>
+                
+                <!-- NUEVO SELECTOR DE TIEMPO EN MODAL DE PAGO -->
+                <div style="margin: 20px 0; text-align: left; background: #F9FAFB; padding: 15px; border-radius: 10px; border: 1px solid #E5E7EB;">
+                    <label style="font-size: 0.85rem; font-weight: 700; color: #374151; margin-bottom: 8px; display: block;">Tiempo a renovar:</label>
+                    <div style="position: relative; width: 100%;">
+                        <i class="fa-solid fa-calendar-plus" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #6B7280;"></i>
+                        <select id="pago-duracion" style="width: 100%; padding: 10px 10px 10px 40px; border-radius: 8px; border: 1px solid #D1D5DB; outline: none; font-family: inherit; font-size: 0.95rem; background: white; color: #1F2937;">
+                            <option value="1m">1 Mes</option>
+                            <option value="3m">3 Meses</option>
+                            <option value="6m">6 Meses</option>
+                            <option value="1y">1 Año</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div class="modal-box__buttons">
                     <button id="btn-cancelar-pago" class="btn-modal-secundario" type="button">Cancelar</button>
                     <button id="btn-confirmar-pago" class="btn-modal-success" type="button">Confirmar Pago</button>

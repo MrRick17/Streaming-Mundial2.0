@@ -29,6 +29,25 @@ document.addEventListener('DOMContentLoaded', () => {
     let costosProveedores = {};
 
     // ==========================================
+    // LÓGICA DE FECHAS DINÁMICAS
+    // ==========================================
+    const selectDuracionCliente = document.getElementById('cliente-duracion');
+    if (selectDuracionCliente) {
+        selectDuracionCliente.addEventListener('change', (e) => {
+            const d = new Date();
+            if (e.target.value === '1m') d.setMonth(d.getMonth() + 1);
+            if (e.target.value === '3m') d.setMonth(d.getMonth() + 3);
+            if (e.target.value === '6m') d.setMonth(d.getMonth() + 6);
+            if (e.target.value === '1y') d.setFullYear(d.getFullYear() + 1);
+            
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            document.getElementById('cliente-fecha-vencimiento').value = `${yyyy}-${mm}-${dd}`;
+        });
+    }
+
+    // ==========================================
     // 2. SISTEMA DE NOTIFICACIONES (TOAST)
     // ==========================================
     const mostrarNotificacion = (mensaje, tipo = 'success') => {
@@ -295,6 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (c.servicioPlataforma === 'IPTV') { icon = 'fa-solid fa-satellite-dish'; }
         else if (c.servicioPlataforma === 'ViX') { icon = 'fa-solid fa-video'; }
         else if (c.servicioPlataforma === 'Paramount+') { icon = 'fa-solid fa-mountain'; }
+        else if (c.servicioPlataforma === 'Gemini') { icon = 'fa-solid fa-sparkles'; }
 
         let fechaTexto = 'Sin Fecha';
         if (c.fechaVencimiento) {
@@ -534,7 +554,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 { nombre: 'Amazon Prime', color: '#00A8E1', icono: 'fa-brands fa-amazon' },
                 { nombre: 'IPTV', color: '#14B8A6', icono: 'fa-solid fa-satellite-dish' },
                 { nombre: 'ViX', color: '#FF1A75', icono: 'fa-solid fa-video' },
-                { nombre: 'Paramount+', color: '#0064FF', icono: 'fa-solid fa-mountain' }
+                { nombre: 'Paramount+', color: '#0064FF', icono: 'fa-solid fa-mountain' },
+                { nombre: 'Gemini', color: '#A142F4', icono: 'fa-solid fa-sparkles' }
             ];
 
             let htmlPlat = '';
@@ -590,7 +611,8 @@ document.addEventListener('DOMContentLoaded', () => {
             { nombre: 'Amazon Prime', color: '#00A8E1', icono: 'fa-brands fa-amazon' },
             { nombre: 'IPTV', color: '#14B8A6', icono: 'fa-solid fa-satellite-dish' },
             { nombre: 'ViX', color: '#FF1A75', icono: 'fa-solid fa-video' },
-            { nombre: 'Paramount+', color: '#0064FF', icono: 'fa-solid fa-mountain' }
+            { nombre: 'Paramount+', color: '#0064FF', icono: 'fa-solid fa-mountain' },
+            { nombre: 'Gemini', color: '#A142F4', icono: 'fa-solid fa-sparkles' }
         ];
 
         serviciosDef.forEach(serv => {
@@ -765,6 +787,7 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (plataforma === 'IPTV') { icono = 'fa-solid fa-satellite-dish'; color = '#14B8A6'; }
             else if (plataforma === 'ViX') { icono = 'fa-solid fa-video'; color = '#FF1A75'; }
             else if (plataforma === 'Paramount+') { icono = 'fa-solid fa-mountain'; color = '#0064FF'; }
+            else if (plataforma === 'Gemini') { icono = 'fa-solid fa-sparkles'; color = '#A142F4'; }
 
             const subcuentasIniciales = [];
             for (let i = 0; i < perfilesMax; i++) subcuentasIniciales.push({ nombre: '', correoPerfil: '' });
@@ -1019,7 +1042,7 @@ document.addEventListener('DOMContentLoaded', () => {
             inputContrasena.required = false;
             inputContrasena.placeholder = 'No requiere contraseña (Invitación)';
             inputCorreoBase.placeholder = 'Correo Admin / Cuenta Madre';
-        } else if (platVal === 'Canva' || platVal === 'CapCut') {
+        } else if (platVal === 'Canva' || platVal === 'CapCut' || platVal === 'Gemini') {
             inputContrasena.required = false;
             inputContrasena.placeholder = 'No requiere contraseña (Invitación por correo)';
             inputCorreoBase.placeholder = 'Correo personal o vinculado del cliente';
@@ -1050,12 +1073,12 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('cliente-id').value = '';
         document.getElementById('titulo-modal-cliente').textContent = 'Agregar Cliente';
         
-        const defaultDate = new Date();
-        defaultDate.setDate(defaultDate.getDate() + 28);
-        const yyyy = defaultDate.getFullYear();
-        const mm = String(defaultDate.getMonth() + 1).padStart(2, '0');
-        const dd = String(defaultDate.getDate()).padStart(2, '0');
-        document.getElementById('cliente-fecha-vencimiento').value = `${yyyy}-${mm}-${dd}`;
+        // Disparar el evento de 1 mes por defecto
+        const duracionSelect = document.getElementById('cliente-duracion');
+        if (duracionSelect) {
+            duracionSelect.value = '1m';
+            duracionSelect.dispatchEvent(new Event('change'));
+        }
 
         if (selectPlataforma) adaptarFormularioSegunPlataforma(selectPlataforma.value);
         toggleModal(modalClienteId, true);
@@ -1075,6 +1098,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('cliente-detalle').value = cliente.servicioDetalle;
         document.getElementById('cliente-correo').value = cliente.servicioCorreo;
         
+        // Dejar el visual en 1 mes por defecto pero sin alterar la fecha real
+        const duracionSelect = document.getElementById('cliente-duracion');
+        if (duracionSelect) duracionSelect.value = '1m';
+
         document.getElementById('cliente-telefono').value = cliente.telefono || '';
         document.getElementById('cliente-metodo-pago').value = cliente.metodoPago || 'Binance';
         document.getElementById('cliente-contrasena').value = cliente.contrasena || '';
@@ -1167,11 +1194,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (plataforma.includes('Spotify')) {
                 mensajeWa = `Hola ${datosCliente.nombre}!\n\nAquí tienes los detalles de tu cuenta de *${plataforma}*:\n\n• *Tu Correo (Invitación):* ${datosCliente.correoPersonal}\n• *Plan:* ${datosCliente.servicioDetalle}${textoContrasena}\n\n• *Tu cuenta vence el:* ${fechaFormateada}\n\n¡Gracias por tu compra!`;
-            } else if (plataforma === 'Canva') {
+            } else if (plataforma === 'Canva' || plataforma === 'CapCut' || plataforma === 'Gemini') {
                 mensajeWa = `Hola ${datosCliente.nombre}!\n\nAquí tienes los detalles de tu acceso a *${plataforma}*:\n\n• *Correo de Invitación:* ${datosCliente.servicioCorreo}\n• *Plan/Equipo:* ${datosCliente.servicioDetalle}${textoContrasena}\n\n• *Tu cuenta vence el:* ${fechaFormateada}\n\n¡Gracias por tu compra! Disfruta tu plataforma.`;
             } else if (plataforma === 'IPTV') {
-                const textoEnlace = datosCliente.enlaceIptv !== '' ? `\n• *Enlace/App:* ${datosCliente.enlaceIptv}` : '';
-                mensajeWa = `Hola ${datosCliente.nombre}!\n\nAquí tienes los datos de acceso de tu cuenta de *IPTV*:\n\n• *Usuario:* ${datosCliente.servicioCorreo}${textoContrasena}${textoEnlace}\n• *Dispositivos/Detalle:* ${datosCliente.servicioDetalle}\n\n• *Tu cuenta vence el:* ${fechaFormateada}\n\n¡Gracias por tu compra! Disfruta tu contenido.`;
+                // FORMATO EXACTO PARA IPTV
+                mensajeWa = `Nombre: ${datosCliente.nombre}\nUsuario: ${datosCliente.servicioCorreo}\nContraseña: ${datosCliente.contrasena}\nEnlace: ${datosCliente.enlaceIptv || 'N/A'}`;
             } else {
                 mensajeWa = `Hola ${datosCliente.nombre}!\n\nAquí tienes los datos de acceso de tu cuenta de *${datosCliente.servicioPlataforma}*:\n\n• *Correo:* ${datosCliente.servicioCorreo}${textoContrasena}\n• *Perfil Asignado:* ${datosCliente.servicioDetalle}\n\n• *Tu cuenta vence el:* ${fechaFormateada}\n\n¡Gracias por tu compra! Disfruta tu contenido.`;
             }
@@ -1198,7 +1225,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let clientePagoId = null;
     const modalPagoId = 'modal-pago';
-    window.abrirModalPago = function(id) { clientePagoId = id; toggleModal(modalPagoId, true); };
+    window.abrirModalPago = function(id) { 
+        clientePagoId = id;
+        const duracionSelect = document.getElementById('pago-duracion');
+        if (duracionSelect) duracionSelect.value = '1m'; // Reset visual al abrir
+        toggleModal(modalPagoId, true); 
+    };
     document.getElementById('btn-cancelar-pago')?.addEventListener('click', () => { toggleModal(modalPagoId, false); clientePagoId = null; });
 
     document.getElementById('btn-confirmar-pago')?.addEventListener('click', () => {
@@ -1206,8 +1238,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const index = clientes.findIndex(c => c.id === clientePagoId);
             if (index > -1) {
                 let baseDate = new Date();
-                if (clientes[index].fechaVencimiento > Date.now()) baseDate = new Date(clientes[index].fechaVencimiento);
-                baseDate.setDate(baseDate.getDate() + 28);
+                if (clientes[index].fechaVencimiento > Date.now()) {
+                    baseDate = new Date(clientes[index].fechaVencimiento);
+                }
+                
+                // Aplicamos la duración elegida en el modal de pago
+                const duracionPago = document.getElementById('pago-duracion').value;
+                if (duracionPago === '1m') baseDate.setMonth(baseDate.getMonth() + 1);
+                if (duracionPago === '3m') baseDate.setMonth(baseDate.getMonth() + 3);
+                if (duracionPago === '6m') baseDate.setMonth(baseDate.getMonth() + 6);
+                if (duracionPago === '1y') baseDate.setFullYear(baseDate.getFullYear() + 1);
                 
                 clientes[index].estado = 'aldia';
                 clientes[index].fechaVencimiento = baseDate.setHours(23, 59, 59, 999);
@@ -1244,7 +1284,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const contenedor = document.getElementById('contenedor-costos');
         if (!contenedor) return;
         
-        const plataformas = ['Netflix', 'Max', 'Spotify Familiar', 'Spotify Personal', 'Disney+', 'Crunchyroll', 'YouTube Premium', 'Canva', 'CapCut', 'Amazon Prime', 'IPTV', 'ViX', 'Paramount+'];
+        const plataformas = ['Netflix', 'Max', 'Spotify Familiar', 'Spotify Personal', 'Disney+', 'Crunchyroll', 'YouTube Premium', 'Canva', 'CapCut', 'Amazon Prime', 'IPTV', 'ViX', 'Paramount+', 'Gemini'];
         contenedor.innerHTML = '';
         
         contenedor.style.display = 'grid';
