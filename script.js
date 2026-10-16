@@ -29,13 +29,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let costosProveedores = {};
 
     // ==========================================
-    // LÓGICA DE FECHAS DINÁMICAS
+    // LÓGICA DE FECHAS DINÁMICAS (28 Días Exactos)
     // ==========================================
     const selectDuracionCliente = document.getElementById('cliente-duracion');
     if (selectDuracionCliente) {
         selectDuracionCliente.addEventListener('change', (e) => {
             const d = new Date();
-            if (e.target.value === '1m') d.setMonth(d.getMonth() + 1);
+            if (e.target.value === '1m') d.setDate(d.getDate() + 28);
             if (e.target.value === '3m') d.setMonth(d.getMonth() + 3);
             if (e.target.value === '6m') d.setMonth(d.getMonth() + 6);
             if (e.target.value === '1y') d.setFullYear(d.getFullYear() + 1);
@@ -44,6 +44,23 @@ document.addEventListener('DOMContentLoaded', () => {
             const mm = String(d.getMonth() + 1).padStart(2, '0');
             const dd = String(d.getDate()).padStart(2, '0');
             document.getElementById('cliente-fecha-vencimiento').value = `${yyyy}-${mm}-${dd}`;
+        });
+    }
+
+    const selectDuracionCuenta = document.getElementById('nuevo-duracion-cuenta');
+    if (selectDuracionCuenta) {
+        selectDuracionCuenta.addEventListener('change', (e) => {
+            const d = new Date();
+            if (e.target.value === '1m') d.setDate(d.getDate() + 28);
+            if (e.target.value === '3m') d.setMonth(d.getMonth() + 3);
+            if (e.target.value === '6m') d.setMonth(d.getMonth() + 6);
+            if (e.target.value === '1y') d.setFullYear(d.getFullYear() + 1);
+            
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            const inputFechaC = document.getElementById('nuevo-vencimiento-cuenta');
+            if(inputFechaC) inputFechaC.value = `${yyyy}-${mm}-${dd}`;
         });
     }
 
@@ -741,7 +758,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const modalAgregarId = 'modal-agregar-cuenta';
     const formAgregarCuenta = document.getElementById('form-agregar-cuenta');
-    document.getElementById('btn-agregar-cuenta')?.addEventListener('click', () => toggleModal(modalAgregarId, true));
+    
+    document.getElementById('btn-agregar-cuenta')?.addEventListener('click', () => {
+        const duracionSelectC = document.getElementById('nuevo-duracion-cuenta');
+        if (duracionSelectC) {
+            duracionSelectC.value = '1m';
+            duracionSelectC.dispatchEvent(new Event('change'));
+        }
+        toggleModal(modalAgregarId, true);
+    });
+    
     document.getElementById('cerrar-modal-agregar')?.addEventListener('click', () => toggleModal(modalAgregarId, false));
     
     const selectNuevoPlat = document.getElementById('nuevo-plataforma');
@@ -1073,7 +1099,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('cliente-id').value = '';
         document.getElementById('titulo-modal-cliente').textContent = 'Agregar Cliente';
         
-        // Disparar el evento de 1 mes por defecto
+        // Disparar el evento de 1 mes (28 días) por defecto
         const duracionSelect = document.getElementById('cliente-duracion');
         if (duracionSelect) {
             duracionSelect.value = '1m';
@@ -1244,7 +1270,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Aplicamos la duración elegida en el modal de pago
                 const duracionPago = document.getElementById('pago-duracion').value;
-                if (duracionPago === '1m') baseDate.setMonth(baseDate.getMonth() + 1);
+                if (duracionPago === '1m') baseDate.setDate(baseDate.getDate() + 28);
                 if (duracionPago === '3m') baseDate.setMonth(baseDate.getMonth() + 3);
                 if (duracionPago === '6m') baseDate.setMonth(baseDate.getMonth() + 6);
                 if (duracionPago === '1y') baseDate.setFullYear(baseDate.getFullYear() + 1);
