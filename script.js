@@ -31,12 +31,12 @@ document.addEventListener('DOMContentLoaded', () => {
         { nombre: 'Amazon Prime',     icono: 'fa-brands fa-amazon',              color: '#00A8E1' },
         { nombre: 'Crunchyroll',      icono: 'fa-solid fa-fire',                 color: '#F47521' },
         { nombre: 'YouTube Premium',  icono: 'fa-brands fa-youtube',             color: '#FF3B3B' },
-        { nombre: 'Canva',            icono: 'fa-solid fa-palette',              color: '#9D5CFF', sinClave: true },
-        { nombre: 'CapCut',           icono: 'fa-solid fa-video',                color: '#00F2FE', sinClave: true },
+        { nombre: 'Canva',            icono: 'fa-solid fa-palette',              color: '#9D5CFF', sinClave: true, invitacion: true },
+        { nombre: 'CapCut',           icono: 'fa-solid fa-video',                color: '#00F2FE', sinClave: true, invitacion: true },
         { nombre: 'IPTV',             icono: 'fa-solid fa-satellite-dish',       color: '#14B8A6' },
         { nombre: 'ViX',              icono: 'fa-solid fa-video',                color: '#FF1A75' },
         { nombre: 'Paramount+',       icono: 'fa-solid fa-mountain',             color: '#3D8BFF' },
-        { nombre: 'Gemini',           icono: 'fa-solid fa-wand-magic-sparkles',  color: '#B26BFF', sinClave: true }
+        { nombre: 'Gemini',           icono: 'fa-solid fa-wand-magic-sparkles',  color: '#B26BFF', sinClave: true, invitacion: true }
     ];
     const platDef = (n) => PLATAFORMAS.find(p => p.nombre === n) || { nombre: n, icono: 'fa-solid fa-play', color: '#94A3B8' };
 
@@ -46,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const $ = (id) => document.getElementById(id);
     const pad = (n) => String(n).padStart(2, '0');
     const esc = (v) => String(v ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    const normCorreo = (v) => String(v ?? '').trim().toLowerCase();
     const dinero = (n) => '$' + (parseFloat(n) || 0).toFixed(2);
     const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -879,9 +880,19 @@ document.addEventListener('DOMContentLoaded', () => {
         actualizarDashboard();
     };
 
+    // Clientes que realmente están asignados a esta cuenta madre (misma plataforma + mismo correo)
     const clientesVinculados = (cuenta) => clientes.filter(cl =>
         cl.servicioPlataforma === cuenta.plataforma &&
-        String(cl.servicioCorreo || '').toLowerCase() === String(cuenta.correo || '').toLowerCase());
+        normCorreo(cl.servicioCorreo) === normCorreo(cuenta.correo));
+
+    // Ocupación = clientes vinculados (fuente de verdad).
+    // Solo en Canva / CapCut / Gemini (donde el cliente usa su propio correo) se suman los nombres anotados a mano en "Gestionar".
+    const calcularOcupados = (cuenta) => {
+        const vinculados = clientesVinculados(cuenta).length;
+        if (!platDef(cuenta.plataforma).invitacion) return vinculados;
+        const anotados = (cuenta.subcuentas || []).filter(s => s && String(s.nombre || '').trim() !== '').length;
+        return Math.max(vinculados, anotados);
+    };
 
     const renderizarCuentas = () => {
         const grid = document.querySelector('#vista-cuentas .grid-cuentas');
@@ -913,8 +924,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const chip = c.estado === 'vencida' ? 'chip--danger' : c.estado === 'por-vencer' ? 'chip--warning' : 'chip--success';
             const badge = c.estado === 'vencida' ? 'Vencida' : c.estado === 'por-vencer' ? 'Por vencer' : 'Al día';
             const max = c.perfilesMax || 1;
-            const ocupados = Math.min(max, Math.max(c.perfilesOcupados || 0, clientesVinculados(c).length));
-            const pct = Math.round((ocupados / max) * 100);
+            const ocupados = calcularOcupados(c);
+            const libres = Math.max(0, max - ocupados);
+            const pct = Math.min(100, Math.round((ocupados / max) * 100));
             const clave = c.contrasena || '';
 
             return `
@@ -954,7 +966,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 <div class="meta-row">
                     <div>Vencimiento<b>${fechaCorta(c.fechaVencimiento)}</b><span class="rel">${textoDias(c.fechaVencimiento)}</span></div>
-                    <div>Ocupados<b>${ocupados} / ${max}</b></div>
+                    <div>Ocupados<b>${ocupados} / ${max}</b><span class="rel">${libres} libre(s)</span></div>
                 </div>
                 <div class="occ-bar"><div class="occ-bar__fill" style="width:${pct}%"></div></div>
 
@@ -1095,6 +1107,13 @@ document.addEventListener('DOMContentLoaded', () => {
         cuenta.subcuentas = [];
         for (let i = 0; i < cuenta.perfilesMax; i++) cuenta.subcuentas.push(prev[i] || { nombre: '', correoPerfil: '' });
 
+        const vinc = clientesVinculados(cuenta);
+        $('lista-vinculados').innerHTML = `
+            <div class="vinculados__titulo"><i class="fa-solid fa-link"></i> Clientes vinculados a esta cuenta (${vinc.length} / ${cuenta.perfilesMax})</div>
+            ${vinc.length
+                ? vinc.map(cl => `<div class="vinculados__item"><strong>${esc(cl.nombre)}</strong><span>${esc(cl.servicioDetalle)}</span></div>`).join('')
+                : '<p class="hint" style="margin:0">Ningún cliente asignado todavía. Cuando agregues un cliente con este mismo correo y plataforma, aparecerá aquí y el contador se actualizará solo.</p>'}`;
+
         $('contenedor-lista-perfiles').innerHTML = cuenta.subcuentas.map((sub, i) => `
             <div class="perfil-item">
                 <div class="perfil-item__head"><span>Perfil ${i + 1}</span><span>Slot ${i + 1} de ${cuenta.perfilesMax}</span></div>
@@ -1205,7 +1224,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Clientes vinculados (se buscan con el correo VIEJO)
         const afectados = clientes.filter(c =>
-            String(c.servicioCorreo || '').toLowerCase() === correoViejo.toLowerCase() && c.servicioPlataforma === cuenta.plataforma);
+            normCorreo(c.servicioCorreo) === normCorreo(correoViejo) && c.servicioPlataforma === cuenta.plataforma);
 
         cuenta.correo = nuevoCorreo;
         cuenta.contrasena = nuevaClave;
@@ -1326,7 +1345,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (platDef(selectPlataforma.value).sinClave) return;
         const correo = inputCorreoBase.value.trim().toLowerCase();
         if (!correo) return;
-        const madre = cuentas.find(c => c.plataforma === selectPlataforma.value && String(c.correo || '').toLowerCase() === correo && c.contrasena);
+        const madre = cuentas.find(c => c.plataforma === selectPlataforma.value && normCorreo(c.correo) === correo && c.contrasena);
         if (madre) {
             inputContrasena.value = madre.contrasena;
             if (hint) hint.style.display = 'block';
