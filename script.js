@@ -1,13 +1,10 @@
 document.addEventListener('DOMContentLoaded', () => {
 
     // ==========================================
-    // 0. MODO PRUEBA LOCAL (PROTECCIÓN DE DATOS)
+    // 0. CONFIGURACIÓN
     // ==========================================
-    const MODO_PRUEBA = false; 
+    const MODO_PRUEBA = false; // true = guarda en localStorage en vez de Firebase
 
-    // ==========================================
-    // 1. INICIALIZACIÓN DE FIREBASE (SM 2)
-    // ==========================================
     const firebaseConfig = {
         apiKey: "AIzaSyBA0NsciehTINXpRz50VzB-Vu2_KAFaOlc",
         authDomain: "streaming-mundial-2.firebaseapp.com",
@@ -17,10 +14,63 @@ document.addEventListener('DOMContentLoaded', () => {
         appId: "1:973602705953:web:2b67d4e70198e93ea58960"
     };
 
-    if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-    }
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
+
+    // ==========================================
+    // 1. PLATAFORMAS (una sola fuente de verdad)
+    //    Para agregar una plataforma nueva, añade una línea aquí.
+    //    sinClave = el cliente no recibe contraseña (invitación por correo)
+    // ==========================================
+    const PLATAFORMAS = [
+        { nombre: 'Netflix',          icono: 'fa-solid fa-play',                 color: '#E50914' },
+        { nombre: 'Max',              icono: 'fa-solid fa-tv',                   color: '#4F6BFF' },
+        { nombre: 'Spotify Familiar', icono: 'fa-brands fa-spotify',             color: '#1DB954', sinClave: true },
+        { nombre: 'Spotify Personal', icono: 'fa-brands fa-spotify',             color: '#1ED760', sinClave: true },
+        { nombre: 'Disney+',          icono: 'fa-solid fa-star',                 color: '#4C74FF' },
+        { nombre: 'Amazon Prime',     icono: 'fa-brands fa-amazon',              color: '#00A8E1' },
+        { nombre: 'Crunchyroll',      icono: 'fa-solid fa-fire',                 color: '#F47521' },
+        { nombre: 'YouTube Premium',  icono: 'fa-brands fa-youtube',             color: '#FF3B3B' },
+        { nombre: 'Canva',            icono: 'fa-solid fa-palette',              color: '#9D5CFF', sinClave: true },
+        { nombre: 'CapCut',           icono: 'fa-solid fa-video',                color: '#00F2FE', sinClave: true },
+        { nombre: 'IPTV',             icono: 'fa-solid fa-satellite-dish',       color: '#14B8A6' },
+        { nombre: 'ViX',              icono: 'fa-solid fa-video',                color: '#FF1A75' },
+        { nombre: 'Paramount+',       icono: 'fa-solid fa-mountain',             color: '#3D8BFF' },
+        { nombre: 'Gemini',           icono: 'fa-solid fa-wand-magic-sparkles',  color: '#B26BFF', sinClave: true }
+    ];
+    const platDef = (n) => PLATAFORMAS.find(p => p.nombre === n) || { nombre: n, icono: 'fa-solid fa-play', color: '#94A3B8' };
+
+    // ==========================================
+    // 2. UTILIDADES
+    // ==========================================
+    const $ = (id) => document.getElementById(id);
+    const pad = (n) => String(n).padStart(2, '0');
+    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    const dinero = (n) => '$' + (parseFloat(n) || 0).toFixed(2);
+    const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+    const aInputFecha = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+    const desdeInputFecha = (v) => { const [y, m, d] = v.split('-').map(Number); return new Date(y, m - 1, d, 23, 59, 59, 999).getTime(); };
+    const fechaCorta = (ts) => { if (!ts) return 'Sin fecha'; const d = new Date(ts); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`; };
+    const inicioDia = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const diasHasta = (ts) => Math.round((inicioDia(new Date(ts)) - inicioDia(new Date())) / 86400000);
+    const textoDias = (ts) => {
+        if (!ts) return '';
+        const n = diasHasta(ts);
+        if (n === 0) return 'Hoy';
+        if (n === 1) return 'Mañana';
+        if (n === -1) return 'Ayer';
+        return n > 0 ? `En ${n} días` : `Hace ${Math.abs(n)} días`;
+    };
+    const sumarDuracion = (base, dur) => {
+        const d = new Date(base);
+        if (dur === '1m') d.setDate(d.getDate() + 28);
+        if (dur === '3m') d.setMonth(d.getMonth() + 3);
+        if (dur === '6m') d.setMonth(d.getMonth() + 6);
+        if (dur === '1y') d.setFullYear(d.getFullYear() + 1);
+        return d;
+    };
 
     // Estado global en memoria
     let cuentas = [];
@@ -29,51 +79,15 @@ document.addEventListener('DOMContentLoaded', () => {
     let costosProveedores = {};
 
     // ==========================================
-    // LÓGICA DE FECHAS DINÁMICAS (28 Días Exactos)
-    // ==========================================
-    const selectDuracionCliente = document.getElementById('cliente-duracion');
-    if (selectDuracionCliente) {
-        selectDuracionCliente.addEventListener('change', (e) => {
-            const d = new Date();
-            if (e.target.value === '1m') d.setDate(d.getDate() + 28);
-            if (e.target.value === '3m') d.setMonth(d.getMonth() + 3);
-            if (e.target.value === '6m') d.setMonth(d.getMonth() + 6);
-            if (e.target.value === '1y') d.setFullYear(d.getFullYear() + 1);
-            
-            const yyyy = d.getFullYear();
-            const mm = String(d.getMonth() + 1).padStart(2, '0');
-            const dd = String(d.getDate()).padStart(2, '0');
-            document.getElementById('cliente-fecha-vencimiento').value = `${yyyy}-${mm}-${dd}`;
-        });
-    }
-
-    const selectDuracionCuenta = document.getElementById('nuevo-duracion-cuenta');
-    if (selectDuracionCuenta) {
-        selectDuracionCuenta.addEventListener('change', (e) => {
-            const d = new Date();
-            if (e.target.value === '1m') d.setDate(d.getDate() + 28);
-            if (e.target.value === '3m') d.setMonth(d.getMonth() + 3);
-            if (e.target.value === '6m') d.setMonth(d.getMonth() + 6);
-            if (e.target.value === '1y') d.setFullYear(d.getFullYear() + 1);
-            
-            const yyyy = d.getFullYear();
-            const mm = String(d.getMonth() + 1).padStart(2, '0');
-            const dd = String(d.getDate()).padStart(2, '0');
-            const inputFechaC = document.getElementById('nuevo-vencimiento-cuenta');
-            if(inputFechaC) inputFechaC.value = `${yyyy}-${mm}-${dd}`;
-        });
-    }
-
-    // ==========================================
-    // 2. SISTEMA DE NOTIFICACIONES (TOAST)
+    // 3. NOTIFICACIONES, MODALES Y COPIAR
     // ==========================================
     const mostrarNotificacion = (mensaje, tipo = 'success') => {
-        const container = document.getElementById('toast-container');
+        const container = $('toast-container');
         if (!container) return;
         const toast = document.createElement('div');
-        toast.className = `toast toast--${tipo}`; 
+        toast.className = `toast toast--${tipo}`;
         const icono = tipo === 'success' ? 'fa-circle-check' : (tipo === 'info' ? 'fa-circle-info' : 'fa-bell');
-        toast.innerHTML = `<i class="fa-solid ${icono}"></i> ${mensaje}`;
+        toast.innerHTML = `<i class="fa-solid ${icono}"></i> ${esc(mensaje)}`;
         container.appendChild(toast);
         setTimeout(() => {
             toast.classList.add('toast--hiding');
@@ -82,1001 +96,1213 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const toggleModal = (modalId, show) => {
-        const modal = document.getElementById(modalId);
-        if (modal) {
-            if (show) modal.classList.remove('modal-oculto'); 
-            else modal.classList.add('modal-oculto'); 
+        const modal = $(modalId);
+        if (!modal) return;
+        modal.classList.toggle('modal-oculto', !show);
+        document.body.classList.toggle('modal-open', !!document.querySelector('.modal-overlay:not(.modal-oculto)'));
+    };
+
+    // Cerrar con Esc o tocando fuera
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        const abiertos = document.querySelectorAll('.modal-overlay:not(.modal-oculto)');
+        if (abiertos.length) toggleModal(abiertos[abiertos.length - 1].id, false);
+    });
+    document.querySelectorAll('.modal-overlay').forEach(ov => {
+        ov.addEventListener('mousedown', (e) => { if (e.target === ov) toggleModal(ov.id, false); });
+    });
+
+    const copiarTexto = async (texto, msg = 'Copiado al portapapeles') => {
+        try {
+            await navigator.clipboard.writeText(texto);
+        } catch (err) {
+            const ta = document.createElement('textarea');
+            ta.value = texto; ta.style.position = 'fixed'; ta.style.opacity = '0';
+            document.body.appendChild(ta); ta.select();
+            try { document.execCommand('copy'); } catch (e2) { /* nada */ }
+            ta.remove();
+        }
+        mostrarNotificacion(msg, 'info');
+    };
+
+    const animarNumero = (el, valor, formato) => {
+        if (!el) return;
+        const previo = parseFloat(el.dataset.val || 0) || 0;
+        el.dataset.val = valor;
+        cancelAnimationFrame(el._raf);
+        if (previo === valor || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            el.textContent = formato(valor);
+            return;
+        }
+        const t0 = performance.now(), dur = 600;
+        const paso = (t) => {
+            const p = Math.min((t - t0) / dur, 1);
+            const e = 1 - Math.pow(1 - p, 3);
+            el.textContent = formato(previo + (valor - previo) * e);
+            if (p < 1) el._raf = requestAnimationFrame(paso);
+        };
+        el._raf = requestAnimationFrame(paso);
+    };
+    const fmtEntero = (v) => String(Math.round(v));
+
+    // Brillo que sigue al cursor en las tarjetas
+    document.addEventListener('pointermove', (e) => {
+        const card = e.target.closest ? e.target.closest('.cuenta-card, .cliente-card, .kpi-card, .plat-card') : null;
+        if (!card) return;
+        const r = card.getBoundingClientRect();
+        card.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+        card.style.setProperty('--my', (e.clientY - r.top) + 'px');
+    }, { passive: true });
+
+    // ==========================================
+    // 4. MOTOR DE TEMAS (color inteligente + fondos)
+    // ==========================================
+    const CLAVE_TEMA = 'sm_tema_v1';
+    const TEMA_DEFAULT = { acento: '#38BDF8', fondo: 'aurora', fondoCustom: '', blur: 22, opacidad: 8, oscurecer: 35, blurFondo: 0, auto: true };
+
+    const ACENTOS = [
+        { n: 'Cielo', c: '#38BDF8' }, { n: 'Índigo', c: '#818CF8' }, { n: 'Violeta', c: '#A855F7' },
+        { n: 'Rosa', c: '#F472B6' }, { n: 'Rojo', c: '#F87171' }, { n: 'Naranja', c: '#FB923C' },
+        { n: 'Ámbar', c: '#FBBF24' }, { n: 'Lima', c: '#A3E635' }, { n: 'Esmeralda', c: '#34D399' },
+        { n: 'Turquesa', c: '#2DD4BF' }
+    ];
+
+    const FONDOS = [
+        { id: 'aurora', nombre: 'Aurora', acento: '#38BDF8',
+          css: 'radial-gradient(60% 55% at 12% 8%, rgba(56,189,248,.55), transparent 62%), radial-gradient(55% 50% at 88% 18%, rgba(139,92,246,.45), transparent 62%), radial-gradient(65% 60% at 62% 100%, rgba(16,185,129,.32), transparent 62%), linear-gradient(135deg,#060A14,#0E1627)' },
+        { id: 'nebulosa', nombre: 'Nebulosa', acento: '#A78BFA',
+          css: 'radial-gradient(55% 50% at 20% 15%, rgba(168,85,247,.55), transparent 62%), radial-gradient(50% 50% at 85% 30%, rgba(236,72,153,.40), transparent 62%), radial-gradient(60% 55% at 50% 100%, rgba(59,130,246,.35), transparent 62%), linear-gradient(135deg,#0B0718,#150B2B)' },
+        { id: 'atardecer', nombre: 'Atardecer', acento: '#FB923C',
+          css: 'radial-gradient(60% 55% at 15% 90%, rgba(251,146,60,.55), transparent 62%), radial-gradient(55% 50% at 85% 15%, rgba(244,63,94,.45), transparent 62%), radial-gradient(50% 50% at 60% 50%, rgba(168,85,247,.25), transparent 62%), linear-gradient(160deg,#1A0B14,#2A0F18)' },
+        { id: 'oceano', nombre: 'Océano', acento: '#22D3EE',
+          css: 'radial-gradient(60% 55% at 80% 10%, rgba(34,211,238,.50), transparent 62%), radial-gradient(60% 55% at 10% 80%, rgba(37,99,235,.50), transparent 62%), radial-gradient(40% 40% at 50% 50%, rgba(20,184,166,.25), transparent 62%), linear-gradient(135deg,#041320,#071E33)' },
+        { id: 'bosque', nombre: 'Bosque', acento: '#34D399',
+          css: 'radial-gradient(60% 55% at 15% 15%, rgba(16,185,129,.50), transparent 62%), radial-gradient(55% 55% at 85% 85%, rgba(132,204,22,.30), transparent 62%), radial-gradient(50% 50% at 70% 20%, rgba(20,184,166,.28), transparent 62%), linear-gradient(135deg,#04120D,#082016)' },
+        { id: 'rosa', nombre: 'Rosa Neón', acento: '#F472B6',
+          css: 'radial-gradient(55% 50% at 80% 15%, rgba(244,114,182,.55), transparent 62%), radial-gradient(55% 55% at 15% 85%, rgba(217,70,239,.45), transparent 62%), radial-gradient(40% 40% at 50% 50%, rgba(99,102,241,.25), transparent 62%), linear-gradient(135deg,#140614,#220A24)' },
+        { id: 'dorado', nombre: 'Dorado', acento: '#FBBF24',
+          css: 'radial-gradient(55% 50% at 15% 10%, rgba(251,191,36,.45), transparent 62%), radial-gradient(55% 55% at 90% 90%, rgba(217,119,6,.40), transparent 62%), linear-gradient(135deg,#0D0A05,#1A1409)' },
+        { id: 'carbon', nombre: 'Carbón', acento: '#94A3B8',
+          css: 'radial-gradient(60% 50% at 50% 0%, rgba(148,163,184,.18), transparent 62%), linear-gradient(135deg,#05070B,#10151D)' }
+    ];
+
+    // Conversión de colores
+    const hexARgb = (hex) => {
+        let h = String(hex || '#38BDF8').replace('#', '');
+        if (h.length === 3) h = h.split('').map(x => x + x).join('');
+        const n = parseInt(h, 16);
+        return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    };
+    const rgbAHsl = (r, g, b) => {
+        r /= 255; g /= 255; b /= 255;
+        const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+        const l = (max + min) / 2;
+        let h = 0, s = 0;
+        if (d) {
+            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+            if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+            else if (max === g) h = (b - r) / d + 2;
+            else h = (r - g) / d + 4;
+            h *= 60;
+        }
+        return [h, s * 100, l * 100];
+    };
+    const hslARgb = (h, s, l) => {
+        s /= 100; l /= 100;
+        const k = (n) => (n + h / 30) % 12;
+        const a = s * Math.min(l, 1 - l);
+        const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+        return [Math.round(255 * f(0)), Math.round(255 * f(8)), Math.round(255 * f(4))];
+    };
+    const rgbAHex = (r, g, b) => '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+    const luminancia = (r, g, b) => {
+        const c = [r, g, b].map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    };
+
+    let tema = { ...TEMA_DEFAULT };
+    try { tema = { ...TEMA_DEFAULT, ...(JSON.parse(localStorage.getItem(CLAVE_TEMA)) || {}) }; } catch (e) { /* tema por defecto */ }
+
+    const guardarTema = () => {
+        try { localStorage.setItem(CLAVE_TEMA, JSON.stringify(tema)); return true; }
+        catch (e) { mostrarNotificacion('No se pudo guardar (imagen muy pesada)', 'info'); return false; }
+    };
+
+    // A partir de UN color genera toda la paleta
+    const aplicarTema = (t) => {
+        const root = document.documentElement.style;
+        const [r0, g0, b0] = hexARgb(t.acento);
+        let [h, s, l] = rgbAHsl(r0, g0, b0);
+        const gris = s < 12;
+        if (!gris) s = Math.max(s, 55);
+        l = Math.min(Math.max(l, 52), 68);
+
+        const [r, g, b] = hslARgb(h, s, l);
+        const [r2, g2, b2] = hslARgb((h + 38) % 360, gris ? s : Math.min(s, 90), Math.min(l + 4, 72));
+        const sf = gris ? 6 : 38;
+        const bg1 = hslARgb(h, sf, 5), bg2 = hslARgb(h, sf, 11), bg3 = hslARgb(h, sf + 4, 8);
+
+        root.setProperty('--accent', rgbAHex(r, g, b));
+        root.setProperty('--accent-rgb', `${r}, ${g}, ${b}`);
+        root.setProperty('--accent-2', rgbAHex(r2, g2, b2));
+        root.setProperty('--accent-2-rgb', `${r2}, ${g2, b2}`.replace(',', ',') );
+        root.setProperty('--on-accent', luminancia(r, g, b) > 0.38 ? '#071019' : '#FFFFFF');
+        root.setProperty('--bg-1', rgbAHex(...bg1));
+        root.setProperty('--bg-2', rgbAHex(...bg2));
+        root.setProperty('--bg-3', rgbAHex(...bg3));
+
+        root.setProperty('--glass-blur', t.blur + 'px');
+        root.setProperty('--card-alpha', (t.opacidad / 100).toFixed(2));
+        root.setProperty('--wall-dim', (t.oscurecer / 100).toFixed(2));
+        root.setProperty('--wall-blur', t.blurFondo + 'px');
+
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', rgbAHex(...bg1));
+
+        const wall = $('wallpaper');
+        if (wall) {
+            if (t.fondo === 'custom' && t.fondoCustom) {
+                wall.style.background = `url("${String(t.fondoCustom).replace(/"/g, '%22')}") center / cover no-repeat`;
+            } else {
+                const f = FONDOS.find(x => x.id === t.fondo) || FONDOS[0];
+                wall.style.background = f.css;
+            }
         }
     };
 
+    // Saca el color dominante (vivo) de una imagen
+    const extraerColorDominante = (src) => new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            try {
+                const c = document.createElement('canvas');
+                c.width = c.height = 40;
+                const ctx = c.getContext('2d', { willReadFrequently: true });
+                ctx.drawImage(img, 0, 0, 40, 40);
+                const data = ctx.getImageData(0, 0, 40, 40).data;
+                const buckets = Array.from({ length: 12 }, () => ({ peso: 0, r: 0, g: 0, b: 0 }));
+                for (let i = 0; i < data.length; i += 4) {
+                    const [h, s, l] = rgbAHsl(data[i], data[i + 1], data[i + 2]);
+                    if (s < 25 || l < 18 || l > 85) continue;
+                    const peso = (s / 100) * (1 - Math.abs(l - 55) / 55);
+                    const k = Math.floor(h / 30) % 12;
+                    buckets[k].peso += peso;
+                    buckets[k].r += data[i] * peso;
+                    buckets[k].g += data[i + 1] * peso;
+                    buckets[k].b += data[i + 2] * peso;
+                }
+                const mejor = buckets.reduce((a, b) => (b.peso > a.peso ? b : a));
+                if (mejor.peso < 0.5) return resolve(null);
+                resolve(rgbAHex(Math.round(mejor.r / mejor.peso), Math.round(mejor.g / mejor.peso), Math.round(mejor.b / mejor.peso)));
+            } catch (e) { resolve(null); }
+        };
+        img.onerror = () => resolve(null);
+        img.src = src;
+    });
+
+    // Comprime la imagen subida para no llenar el almacenamiento
+    const procesarImagenSubida = (file) => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = reject;
+        reader.onload = () => {
+            const img = new Image();
+            img.onerror = reject;
+            img.onload = () => {
+                const max = 1920;
+                const esc2 = Math.min(1, max / Math.max(img.width, img.height));
+                const c = document.createElement('canvas');
+                c.width = Math.round(img.width * esc2);
+                c.height = Math.round(img.height * esc2);
+                c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+                resolve(c.toDataURL('image/jpeg', 0.82));
+            };
+            img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+    });
+
+    const colorDelFondoActual = async () => {
+        if (tema.fondo === 'custom' && tema.fondoCustom) return await extraerColorDominante(tema.fondoCustom);
+        const f = FONDOS.find(x => x.id === tema.fondo);
+        return f ? f.acento : null;
+    };
+
+    // ----- UI de Apariencia -----
+    const renderizarSwatches = () => {
+        const cont = $('swatches');
+        if (!cont) return;
+        const actual = String(tema.acento).toLowerCase();
+        cont.innerHTML = ACENTOS.map(a =>
+            `<button type="button" class="swatch ${a.c.toLowerCase() === actual ? 'active' : ''}" style="--c:${a.c}" data-color="${a.c}" title="${a.n}"></button>`
+        ).join('');
+        const picker = $('tema-color'); if (picker) picker.value = tema.acento;
+        const hex = $('tema-color-hex'); if (hex) hex.textContent = tema.acento;
+    };
+
+    const renderizarFondos = () => {
+        const cont = $('fondos-grid');
+        if (!cont) return;
+        let html = FONDOS.map(f =>
+            `<div class="fondo-thumb ${tema.fondo === f.id ? 'active' : ''}" data-fondo="${f.id}" style="background:${f.css}"><span>${f.nombre}</span></div>`
+        ).join('');
+        if (tema.fondoCustom) {
+            html += `<div class="fondo-thumb ${tema.fondo === 'custom' ? 'active' : ''}" data-fondo="custom" style="background:url('${String(tema.fondoCustom).replace(/'/g, '%27')}') center/cover"><span>Mi imagen</span></div>`;
+        }
+        cont.innerHTML = html;
+    };
+
+    const sincronizarControlesTema = () => {
+        const set = (id, v, sufijo, lbl) => { const el = $(id); if (el) el.value = v; const l = $(lbl); if (l) l.textContent = v + sufijo; };
+        set('tema-blur', tema.blur, 'px', 'val-blur');
+        set('tema-opacidad', tema.opacidad, '%', 'val-opacidad');
+        set('tema-oscurecer', tema.oscurecer, '%', 'val-oscurecer');
+        set('tema-blurfondo', tema.blurFondo, 'px', 'val-blurfondo');
+        const auto = $('tema-auto'); if (auto) auto.checked = !!tema.auto;
+        renderizarSwatches();
+        renderizarFondos();
+    };
+
+    const refrescarTema = () => { aplicarTema(tema); guardarTema(); };
+
+    const iniciarAjustesApariencia = () => {
+        // Colores rápidos
+        $('swatches')?.addEventListener('click', (e) => {
+            const b = e.target.closest('.swatch'); if (!b) return;
+            tema.acento = b.dataset.color; tema.auto = false;
+            refrescarTema(); sincronizarControlesTema();
+        });
+        // Color personalizado
+        $('tema-color')?.addEventListener('input', (e) => {
+            tema.acento = e.target.value; tema.auto = false;
+            aplicarTema(tema);
+            const hex = $('tema-color-hex'); if (hex) hex.textContent = tema.acento;
+            const auto = $('tema-auto'); if (auto) auto.checked = false;
+            document.querySelectorAll('#swatches .swatch').forEach(s => s.classList.toggle('active', s.dataset.color.toLowerCase() === tema.acento.toLowerCase()));
+        });
+        $('tema-color')?.addEventListener('change', () => guardarTema());
+
+        // Color automático según fondo
+        $('tema-auto')?.addEventListener('change', async (e) => {
+            tema.auto = e.target.checked;
+            if (tema.auto) {
+                const c = await colorDelFondoActual();
+                if (c) tema.acento = c;
+            }
+            refrescarTema(); sincronizarControlesTema();
+        });
+
+        // Elegir fondo
+        $('fondos-grid')?.addEventListener('click', async (e) => {
+            const t = e.target.closest('.fondo-thumb'); if (!t) return;
+            tema.fondo = t.dataset.fondo;
+            if (tema.auto) { const c = await colorDelFondoActual(); if (c) tema.acento = c; }
+            refrescarTema(); sincronizarControlesTema();
+        });
+
+        // Subir imagen
+        $('fondo-archivo')?.addEventListener('change', async (e) => {
+            const file = e.target.files && e.target.files[0];
+            e.target.value = '';
+            if (!file) return;
+            try {
+                tema.fondoCustom = await procesarImagenSubida(file);
+                tema.fondo = 'custom';
+                if (tema.auto) { const c = await extraerColorDominante(tema.fondoCustom); if (c) tema.acento = c; }
+                refrescarTema(); sincronizarControlesTema();
+                mostrarNotificacion('Fondo aplicado');
+            } catch (err) { mostrarNotificacion('No se pudo leer esa imagen', 'info'); }
+        });
+
+        // Imagen por URL
+        $('btn-fondo-url')?.addEventListener('click', async () => {
+            const url = ($('fondo-url').value || '').trim();
+            if (!/^https?:\/\//i.test(url)) { mostrarNotificacion('Pega un enlace que empiece con https://', 'info'); return; }
+            tema.fondoCustom = url; tema.fondo = 'custom';
+            if (tema.auto) { const c = await extraerColorDominante(url); if (c) tema.acento = c; }
+            refrescarTema(); sincronizarControlesTema();
+            mostrarNotificacion('Fondo aplicado');
+        });
+
+        // Sliders de cristal
+        [['tema-blur', 'blur', 'px', 'val-blur'], ['tema-opacidad', 'opacidad', '%', 'val-opacidad'],
+         ['tema-oscurecer', 'oscurecer', '%', 'val-oscurecer'], ['tema-blurfondo', 'blurFondo', 'px', 'val-blurfondo']]
+        .forEach(([id, clave, suf, lbl]) => {
+            $(id)?.addEventListener('input', (e) => {
+                tema[clave] = parseInt(e.target.value, 10);
+                const l = $(lbl); if (l) l.textContent = tema[clave] + suf;
+                aplicarTema(tema);
+            });
+            $(id)?.addEventListener('change', () => guardarTema());
+        });
+
+        // Restablecer
+        $('btn-reset-tema')?.addEventListener('click', () => {
+            tema = { ...TEMA_DEFAULT };
+            try { localStorage.removeItem(CLAVE_TEMA); } catch (e) { /* nada */ }
+            aplicarTema(tema); sincronizarControlesTema();
+            mostrarNotificacion('Apariencia restablecida', 'info');
+        });
+
+        // Pestañas de Ajustes
+        $('tabs-ajustes')?.addEventListener('click', (e) => {
+            const b = e.target.closest('.tab-btn'); if (!b) return;
+            irATab(b.dataset.tab);
+        });
+    };
+
+    const irATab = (tab) => {
+        document.querySelectorAll('#tabs-ajustes .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+        document.querySelectorAll('#vista-configuracion .tab-panel').forEach(p => p.classList.toggle('vista-oculta', p.id !== `tab-${tab}`));
+    };
+
+    aplicarTema(tema);
+
     // ==========================================
-    // 3. NAVEGACIÓN ENTRE VISTAS (SPA)
+    // 5. NAVEGACIÓN ENTRE VISTAS
     // ==========================================
     const navItems = document.querySelectorAll('.nav-item');
     const vistas = document.querySelectorAll('.vista-seccion');
 
-    if (navItems.length > 0 && vistas.length > 0) {
-        navItems.forEach(item => {
-            item.addEventListener('click', (e) => {
-                e.preventDefault(); 
-                const destino = item.getAttribute('data-vista');
-                if (!destino) return;
+    const irAVista = (destino) => {
+        const vista = $(`vista-${destino}`);
+        if (!vista) return;
+        navItems.forEach(n => n.classList.toggle('active', n.getAttribute('data-vista') === destino));
+        vistas.forEach(v => v.classList.add('vista-oculta'));
+        vista.classList.remove('vista-oculta');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        try { localStorage.setItem('sm_vista', destino); } catch (e) { /* nada */ }
+    };
 
-                navItems.forEach(nav => nav.classList.remove('active'));
-                item.classList.add('active');
-
-                vistas.forEach(vista => vista.classList.add('vista-oculta'));
-                
-                const vistaAMostrar = document.getElementById(`vista-${destino}`);
-                if (vistaAMostrar) vistaAMostrar.classList.remove('vista-oculta');
-            });
+    navItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            const destino = item.getAttribute('data-vista');
+            if (destino) irAVista(destino);
         });
-    }
+    });
+
+    $('btn-tema-rapido')?.addEventListener('click', () => { irAVista('configuracion'); irATab('apariencia'); });
 
     // ==========================================
-    // 4. SINCRONIZACIÓN CON FIREBASE O LOCAL
+    // 6. SINCRONIZACIÓN (FIREBASE / LOCAL)
     // ==========================================
     const guardarNube = () => {
         if (MODO_PRUEBA) {
             localStorage.setItem('streamingMundialData', JSON.stringify({ cuentas, clientes, historialPagos, costosProveedores }));
             return;
         }
+        db.collection('sistema').doc('datosPrincipales').set({ cuentas, clientes, historialPagos, costosProveedores })
+            .catch(error => {
+                console.error('Error al guardar en Firebase:', error);
+                mostrarNotificacion('Error de conexión con la base de datos', 'info');
+            });
+    };
 
-        db.collection('sistema').doc('datosPrincipales').set({
-            cuentas: cuentas,
-            clientes: clientes,
-            historialPagos: historialPagos,
-            costosProveedores: costosProveedores
-        }).catch(error => {
-            console.error("Error al guardar en Firebase:", error);
-            mostrarNotificacion("Error de conexión con la base de datos", "info");
-        });
+    const ocultarLoader = () => {
+        const l = $('loader');
+        if (!l) return;
+        l.classList.add('loader--hide');
+        setTimeout(() => l.remove(), 600);
+    };
+    setTimeout(ocultarLoader, 8000);
+
+    const refrescarTodo = () => {
+        actualizarDashboard();
+        if (!document.activeElement || !document.activeElement.closest('#contenedor-costos')) renderizarVistaCostos();
+        renderizarCuentas();
+        renderizarClientes();
+        const info = $('info-backup-auto');
+        if (info) {
+            try {
+                const b = JSON.parse(localStorage.getItem('sm_backup_auto'));
+                info.textContent = b ? `Copia automática en este dispositivo: ${new Date(b.fecha).toLocaleString('es')}` : '';
+            } catch (e) { info.textContent = ''; }
+        }
     };
 
     const escucharNubeEnTiempoReal = () => {
-        const refrescarVistasConFiltroActual = () => {
-            actualizarDashboard();
-            renderizarVistaCostos();
-
-            const filtroCuentasActivo = document.querySelector('#vista-cuentas .btn-filtro.active');
-            const valFiltroCuentas = filtroCuentasActivo ? filtroCuentasActivo.getAttribute('data-filtro') : 'Todas';
-            const textoBusqCuentas = document.getElementById('buscador-cuentas')?.value || '';
-            if (textoBusqCuentas.trim() !== '') {
-                renderizarCuentas(textoBusqCuentas);
-            } else {
-                renderizarCuentas(valFiltroCuentas === 'Todas' ? '' : valFiltroCuentas);
-            }
-
-            const filtroClientesActivo = document.querySelector('#vista-clientes .btn-filtro.active');
-            const valFiltroClientes = filtroClientesActivo ? filtroClientesActivo.getAttribute('data-filtro') : 'todos';
-            renderizarClientes(valFiltroClientes);
+        const cargar = (data) => {
+            cuentas = data.cuentas || [];
+            clientes = data.clientes || [];
+            historialPagos = data.historialPagos || [];
+            costosProveedores = data.costosProveedores || {};
         };
 
         if (MODO_PRUEBA) {
-            const localData = JSON.parse(localStorage.getItem('streamingMundialData'));
-            if (localData) {
-                cuentas = localData.cuentas || [];
-                clientes = localData.clientes || [];
-                historialPagos = localData.historialPagos || [];
-                costosProveedores = localData.costosProveedores || {};
-            }
-            refrescarVistasConFiltroActual();
+            const local = JSON.parse(localStorage.getItem('streamingMundialData'));
+            if (local) cargar(local);
+            refrescarTodo();
+            ocultarLoader();
             return;
         }
 
         db.collection('sistema').doc('datosPrincipales').onSnapshot((doc) => {
             if (doc.exists) {
-                const data = doc.data();
-                cuentas = data.cuentas || [];
-                clientes = data.clientes || [];
-                historialPagos = data.historialPagos || [];
-                costosProveedores = data.costosProveedores || {};
+                cargar(doc.data());
+                // Copia de seguridad automática en este dispositivo
+                try { localStorage.setItem('sm_backup_auto', JSON.stringify({ fecha: Date.now(), cuentas, clientes, historialPagos, costosProveedores })); } catch (e) { /* nada */ }
             }
-            refrescarVistasConFiltroActual();
+            refrescarTodo();
+            ocultarLoader();
         }, (error) => {
-            console.error("Error al escuchar Firebase:", error);
+            console.error('Error al escuchar Firebase:', error);
+            ocultarLoader();
+            mostrarNotificacion('No se pudo conectar con la base de datos', 'info');
         });
     };
 
     // ==========================================
-    // 5. REGISTRO EN HISTORIAL CONTABLE
+    // 7. HISTORIAL CONTABLE
     // ==========================================
     const registrarTransaccionHistorial = (monto, plataforma, clienteId) => {
-        const fechaActual = new Date();
-        const mesStr = `${fechaActual.getFullYear()}-${String(fechaActual.getMonth() + 1).padStart(2, '0')}`;
-        
+        const f = new Date();
         historialPagos.push({
             id: Date.now(),
-            clienteId: clienteId,
+            clienteId,
             monto: parseFloat(monto) || 0,
-            plataforma: plataforma,
-            fecha: fechaActual.getTime(),
-            mes: mesStr
+            plataforma,
+            fecha: f.getTime(),
+            mes: `${f.getFullYear()}-${pad(f.getMonth() + 1)}`
         });
-        guardarNube();
     };
 
     // ==========================================
-    // 6. VERIFICACIÓN DE VENCIMIENTOS
+    // 8. VENCIMIENTOS
     // ==========================================
     const verificarVencimientosClientes = () => {
         const ahora = new Date();
-        const inicioHoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()).getTime();
-        const finMañana = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate() + 1, 23, 59, 59, 999).getTime();
-
-        let actualizado = false;
+        const inicioHoy = inicioDia(ahora);
+        const finManana = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate() + 1, 23, 59, 59, 999).getTime();
+        let cambio = false;
         clientes.forEach(c => {
             if (!c.fechaVencimiento) return;
-
-            let nuevoEstado = 'aldia';
-            if (c.fechaVencimiento < inicioHoy) {
-                nuevoEstado = 'moroso';
-            } else if (c.fechaVencimiento <= finMañana) {
-                nuevoEstado = 'vence-hoy';
-            } else {
-                nuevoEstado = 'aldia';
-            }
-
-            if (c.estado !== nuevoEstado) {
-                c.estado = nuevoEstado;
-                actualizado = true;
-            }
+            let nuevo = 'aldia';
+            if (c.fechaVencimiento < inicioHoy) nuevo = 'moroso';
+            else if (c.fechaVencimiento <= finManana) nuevo = 'vence-hoy';
+            if (c.estado !== nuevo) { c.estado = nuevo; cambio = true; }
         });
-        if (actualizado) guardarNube();
+        if (cambio) guardarNube();
     };
 
     const verificarVencimientosCuentas = () => {
-        const hoy = new Date();
-        const hoyInicio = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()).getTime();
+        const hoyInicio = inicioDia(new Date());
         const limiteAviso = hoyInicio + (2 * 24 * 60 * 60 * 1000);
-
-        let actualizado = false;
+        let cambio = false;
         cuentas.forEach(c => {
-            if (!c.fechaVencimiento) return; 
-
-            let nuevoEstado = 'aldia';
-            if (c.fechaVencimiento < hoyInicio) nuevoEstado = 'vencida';
-            else if (c.fechaVencimiento <= limiteAviso) nuevoEstado = 'por-vencer';
-
-            if (c.estado !== nuevoEstado) {
-                c.estado = nuevoEstado;
-                actualizado = true;
-            }
+            if (!c.fechaVencimiento) return;
+            let nuevo = 'aldia';
+            if (c.fechaVencimiento < hoyInicio) nuevo = 'vencida';
+            else if (c.fechaVencimiento <= limiteAviso) nuevo = 'por-vencer';
+            if (c.estado !== nuevo) { c.estado = nuevo; cambio = true; }
         });
-        if (actualizado) guardarNube();
+        if (cambio) guardarNube();
     };
 
-    // AVISO AUTOMÁTICO AL ENTRAR
+    // Aviso automático al entrar (clientes que vencen exactamente hoy)
     let alertaInicioMostrada = false;
-
-    const mostrarModalAvisoHoy = (clientesHoy) => {
-        let modal = document.getElementById('modal-aviso-vencidos-hoy');
-        
-        if (!modal) {
-            modal = document.createElement('div');
-            modal.id = 'modal-aviso-vencidos-hoy';
-            modal.className = 'modal-overlay z-alto'; 
-            modal.innerHTML = `
-                <div class="modal-box" style="text-align: center; padding: 35px 25px; max-width: 400px; border-top: 4px solid #F59E0B;">
-                    <div style="font-size: 3.5rem; color: #F59E0B; margin-bottom: 15px; filter: drop-shadow(0 5px 15px rgba(245, 158, 11, 0.4));">
-                        <i class="fa-solid fa-clock"></i>
-                    </div>
-                    <h3 class="modal-box__title" style="color: #FFFFFF; font-size: 1.4rem; font-weight: 900; margin-bottom: 10px;">Aviso de Vencimiento</h3>
-                    <p class="modal-box__text" id="texto-aviso-hoy" style="color: rgba(255, 255, 255, 0.85); font-size: 0.95rem; line-height: 1.6; margin-bottom: 25px;"></p>
-                    <div class="modal-box__buttons" style="display: flex; justify-content: center;">
-                        <button id="btn-cerrar-aviso-hoy" class="btn-primario btn-full-mt" style="width: 100%; margin-top: 0; padding: 12px; border-radius: 14px;">Entendido</button>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-
-            document.getElementById('btn-cerrar-aviso-hoy').addEventListener('click', () => {
-                modal.classList.add('modal-oculto');
-            });
-        }
-
-        document.getElementById('texto-aviso-hoy').innerHTML = `Tienes <strong>${clientesHoy.length}</strong> cliente(s) cuyo servicio vence exactamente el día de hoy.`;
-        modal.classList.remove('modal-oculto');
-    };
-
     const verificarAlertasAlEntrar = () => {
-        if (alertaInicioMostrada) return;
-        if (typeof clientes === 'undefined' || !Array.isArray(clientes)) return;
-
+        if (alertaInicioMostrada || !Array.isArray(clientes) || clientes.length === 0) return;
         alertaInicioMostrada = true;
-
         const hoy = new Date();
-        const anioHoy = hoy.getFullYear();
-        const mesHoy = hoy.getMonth();
-        const diaHoy = hoy.getDate();
-
         const clientesHoy = clientes.filter(c => {
             if (!c.fechaVencimiento) return false;
             const f = new Date(c.fechaVencimiento);
-            return f.getFullYear() === anioHoy && f.getMonth() === mesHoy && f.getDate() === diaHoy;
+            return f.getFullYear() === hoy.getFullYear() && f.getMonth() === hoy.getMonth() && f.getDate() === hoy.getDate();
         });
+        if (clientesHoy.length === 0) return;
+        const nombres = clientesHoy.slice(0, 5).map(c => esc(c.nombre)).join(', ') + (clientesHoy.length > 5 ? '…' : '');
+        $('texto-aviso-hoy').innerHTML = `Tienes <strong>${clientesHoy.length}</strong> cliente(s) cuyo servicio vence exactamente el día de hoy.<span class="lista-nombres">${nombres}</span>`;
+        setTimeout(() => toggleModal('modal-aviso-vencidos-hoy', true), 900);
+    };
+    $('btn-cerrar-aviso-hoy')?.addEventListener('click', () => toggleModal('modal-aviso-vencidos-hoy', false));
 
-        if (clientesHoy.length > 0) {
-            setTimeout(() => {
-                mostrarModalAvisoHoy(clientesHoy);
-            }, 1000);
+    // ==========================================
+    // 9. MENSAJES DE WHATSAPP
+    // ==========================================
+    const construirMensajeEntrega = (c) => {
+        const fecha = new Date(c.fechaVencimiento).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const clave = c.contrasena ? `\n• *Contraseña/PIN:* ${c.contrasena}` : '';
+        const p = c.servicioPlataforma;
+        if (p.includes('Spotify')) {
+            return `Hola ${c.nombre}!\n\nAquí tienes los detalles de tu cuenta de *${p}*:\n\n• *Tu Correo (Invitación):* ${c.correoPersonal}\n• *Plan:* ${c.servicioDetalle}${clave}\n\n• *Tu cuenta vence el:* ${fecha}\n\n¡Gracias por tu compra!`;
         }
+        if (p === 'Canva' || p === 'CapCut' || p === 'Gemini') {
+            return `Hola ${c.nombre}!\n\nAquí tienes los detalles de tu acceso a *${p}*:\n\n• *Correo de Invitación:* ${c.servicioCorreo}\n• *Plan/Equipo:* ${c.servicioDetalle}${clave}\n\n• *Tu cuenta vence el:* ${fecha}\n\n¡Gracias por tu compra! Disfruta tu plataforma.`;
+        }
+        if (p === 'IPTV') {
+            return `Nombre: ${c.nombre}\nUsuario: ${c.servicioCorreo}\nContraseña: ${c.contrasena}\nEnlace: ${c.enlaceIptv || 'N/A'}`;
+        }
+        return `Hola ${c.nombre}!\n\nAquí tienes los datos de acceso de tu cuenta de *${p}*:\n\n• *Correo:* ${c.servicioCorreo}${clave}\n• *Perfil Asignado:* ${c.servicioDetalle}\n\n• *Tu cuenta vence el:* ${fecha}\n\n¡Gracias por tu compra! Disfruta tu contenido.`;
     };
 
+    const urlWhatsApp = (telefono, mensaje) => `https://api.whatsapp.com/send?phone=${telefono}&text=${encodeURIComponent(mensaje)}`;
+
     // ==========================================
-    // 7. RENDERIZADO DE TARJETAS DE CLIENTE
+    // 10. TARJETA DE CLIENTE
     // ==========================================
-    const generarHTMLTarjetaCliente = function(c) {
+    const generarHTMLTarjetaCliente = (c) => {
         const esMoroso = c.estado === 'moroso';
         const esHoy = c.estado === 'vence-hoy';
-        
-        let iniciales = 'CL';
-        if (c.nombre) {
-            const partes = c.nombre.split(' ');
-            iniciales = partes.map(function(n) { return n[0]; }).join('').substring(0, 2).toUpperCase();
-        }
+        const tint = esMoroso ? 'tint-danger' : esHoy ? 'tint-warning' : 'tint-success';
+        const chip = esMoroso ? 'chip--danger' : esHoy ? 'chip--warning' : 'chip--success';
 
-        const bgGradient = esMoroso ? 'bg-gradient-danger' : esHoy ? 'bg-gradient-warning' : 'bg-gradient-success';
-        const badgeTexto = esMoroso ? 'Atrasado' : esHoy ? 'Vence Hoy/Mañana' : 'Al Día';
+        let badge = 'Al Día';
+        if (esMoroso) badge = 'Atrasado';
+        else if (esHoy) badge = diasHasta(c.fechaVencimiento) <= 0 ? 'Vence hoy' : 'Vence mañana';
 
-        let icon = 'fa-solid fa-play'; 
-        if (c.servicioPlataforma.indexOf('Spotify') !== -1) { icon = 'fa-brands fa-spotify'; }
-        else if (c.servicioPlataforma === 'Max') { icon = 'fa-solid fa-tv'; }
-        else if (c.servicioPlataforma === 'Disney+') { icon = 'fa-solid fa-star'; }
-        else if (c.servicioPlataforma === 'Crunchyroll') { icon = 'fa-solid fa-fire'; }
-        else if (c.servicioPlataforma === 'YouTube Premium') { icon = 'fa-brands fa-youtube'; }
-        else if (c.servicioPlataforma === 'Canva') { icon = 'fa-solid fa-palette'; }
-        else if (c.servicioPlataforma === 'CapCut') { icon = 'fa-solid fa-video'; }
-        else if (c.servicioPlataforma === 'Amazon Prime') { icon = 'fa-brands fa-amazon'; }
-        else if (c.servicioPlataforma === 'IPTV') { icon = 'fa-solid fa-satellite-dish'; }
-        else if (c.servicioPlataforma === 'ViX') { icon = 'fa-solid fa-video'; }
-        else if (c.servicioPlataforma === 'Paramount+') { icon = 'fa-solid fa-mountain'; }
-        else if (c.servicioPlataforma === 'Gemini') { icon = 'fa-solid fa-sparkles'; }
-
-        let fechaTexto = 'Sin Fecha';
-        if (c.fechaVencimiento) {
-            const f = new Date(c.fechaVencimiento);
-            let dStr = String(f.getDate()); if (dStr.length === 1) dStr = '0' + dStr;
-            let mStr = String(f.getMonth() + 1); if (mStr.length === 1) mStr = '0' + mStr;
-            fechaTexto = dStr + '/' + mStr + '/' + f.getFullYear();
-        }
-
-        const correoAMostrar = (c.servicioPlataforma.indexOf('Spotify') !== -1 && c.correoPersonal) ? c.correoPersonal : c.servicioCorreo;
-        const btnTextoRenovar = (esMoroso || esHoy) ? 'Cobrar' : 'Renovar';
-        const iconRenovar = (esMoroso || esHoy) ? 'fa-solid fa-bell' : 'fa-solid fa-receipt';
-        const claseBotonPago = (esMoroso || esHoy) ? 'danger' : 'success';
+        const iniciales = (c.nombre || 'CL').split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'CL';
+        const d = platDef(c.servicioPlataforma);
+        const correo = (c.servicioPlataforma.includes('Spotify') && c.correoPersonal) ? c.correoPersonal : c.servicioCorreo;
+        const cobrar = esMoroso || esHoy;
 
         return `
-            <div class="cliente-card ${bgGradient}">
-                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.18);">
-                    <div style="display: flex; align-items: center; gap: 14px;">
-                        <div class="glass-icon-circle" style="font-weight: 800; font-size: 1.1rem; color: #FFFFFF;">
-                            ${iniciales}
-                        </div>
-                        <div>
-                            <h3 style="margin: 0; font-size: 1.15rem; color: #FFFFFF; font-weight: 800; text-shadow: 0 2px 8px rgba(0,0,0,0.3);">${c.nombre}</h3>
-                            <span style="background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 8px; font-size: 0.7rem; font-weight: 800; color: #FFFFFF; border: 1px solid rgba(255,255,255,0.25); display: inline-block; margin-top: 5px; text-transform: uppercase; letter-spacing: 0.5px;">${badgeTexto}</span>
-                        </div>
-                    </div>
-                    <button onclick="eliminarCliente(${c.id})" title="Borrar" type="button" style="background: rgba(239,68,68,0.25); border: 1px solid rgba(239,68,68,0.5); color: #ff9999; cursor: pointer; font-size: 1rem; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.4)'" onmouseout="this.style.background='rgba(239,68,68,0.25)'"><i class="fa-solid fa-trash"></i></button>
-                </div>
-                
-                <div style="padding: 16px 0;">
-                    <div style="display: flex; align-items: center; gap: 14px;">
-                        <div class="glass-icon-circle" style="background: rgba(255,255,255,0.18);">
-                            <i class="${icon}"></i>
-                        </div>
-                        <div style="flex: 1;">
-                            <p style="margin: 0; font-size: 1rem; font-weight: 800; color: #FFFFFF;">
-                                ${c.servicioPlataforma} <span style="font-size: 0.8rem; font-weight: 500; opacity: 0.9;">(${c.servicioDetalle})</span>
-                                <span style="float: right; font-size: 1.2rem; font-weight: 900; color: #38BDF8; text-shadow: 0 2px 10px rgba(56,189,248,0.4);">$${parseFloat(c.montoPago || 0).toFixed(2)}</span>
-                            </p>
-                            <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: rgba(255,255,255,0.9); font-weight: 500; word-break: break-all;">${correoAMostrar}</p>
-                            <p style="margin: 6px 0 0 0; font-size: 0.82rem; font-weight: 700; color: #FFFFFF;">
-                                <i class="fa-regular fa-calendar" style="margin-right: 5px; opacity: 0.8;"></i>Vence: ${fechaTexto}
-                            </p>
-                        </div>
+        <article class="cliente-card ${tint}">
+            <div class="card-head">
+                <div class="card-id">
+                    <div class="avatar">${esc(iniciales)}</div>
+                    <div style="min-width:0">
+                        <h3 class="card-name">${esc(c.nombre)}</h3>
+                        <span class="chip ${chip}"><i class="dot"></i>${badge}</span>
                     </div>
                 </div>
+                <button class="icon-btn icon-btn--danger" type="button" data-accion="eliminar-cliente" data-id="${c.id}" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+            </div>
 
-                <div style="display: flex; gap: 10px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.18); flex-wrap: wrap;">
-                    <button class="glass-btn" onclick="abrirModalCliente(${c.id})" type="button"><i class="fa-solid fa-pen-to-square"></i> Editar</button>
-                    <button class="glass-btn ${claseBotonPago}" onclick="abrirModalPago(${c.id})" type="button"><i class="${iconRenovar}"></i> ${btnTextoRenovar}</button>
-                    ${(esMoroso || esHoy) 
-                        ? `<button class="glass-btn" style="background: linear-gradient(135deg, rgba(37,211,102,0.4), rgba(18,140,126,0.6)); border-color: rgba(37,211,102,0.7);" onclick="enviarRecordatorio(${c.id})" type="button"><i class="fa-brands fa-whatsapp"></i> ${c.estadoAviso === 'avisado' ? 'Reenviar' : 'Avisar'}</button>` 
-                        : ``
-                    }
+            <div class="card-body">
+                <div class="svc-icon" style="--c:${d.color}"><i class="${d.icono}"></i></div>
+                <div class="svc-info">
+                    <div class="svc-line">
+                        <strong>${esc(c.servicioPlataforma)}</strong>
+                        <span class="svc-detalle">(${esc(c.servicioDetalle)})</span>
+                        <span class="price">${dinero(c.montoPago)}</span>
+                    </div>
+                    <p class="svc-mail">${esc(correo)}</p>
+                    <p class="svc-date"><i class="fa-regular fa-calendar"></i> Vence: ${fechaCorta(c.fechaVencimiento)} <span class="rel">· ${textoDias(c.fechaVencimiento)}</span></p>
                 </div>
             </div>
-        `;
+
+            <div class="card-actions">
+                <button class="glass-btn" type="button" data-accion="editar-cliente" data-id="${c.id}"><i class="fa-solid fa-pen-to-square"></i> Editar</button>
+                <button class="glass-btn ${cobrar ? 'danger' : 'success'}" type="button" data-accion="pago" data-id="${c.id}"><i class="${cobrar ? 'fa-solid fa-bell' : 'fa-solid fa-receipt'}"></i> ${cobrar ? 'Cobrar' : 'Renovar'}</button>
+                ${cobrar ? `<button class="glass-btn wa" type="button" data-accion="recordar" data-id="${c.id}"><i class="fa-brands fa-whatsapp"></i> ${c.estadoAviso === 'avisado' ? 'Reenviar' : 'Avisar'}</button>` : ''}
+                <button class="icon-btn icon-btn--sm push" type="button" data-accion="copiar-datos" data-id="${c.id}" title="Copiar datos de acceso"><i class="fa-regular fa-copy"></i></button>
+            </div>
+        </article>`;
     };
 
     // ==========================================
-    // 8. ACTUALIZACIÓN DEL DASHBOARD Y KPIS
+    // 11. DASHBOARD
     // ==========================================
     const actualizarDashboard = () => {
         verificarVencimientosClientes();
         verificarVencimientosCuentas();
 
-        const kpiMadres = document.getElementById('kpi-madres');
-        const kpiAldia = document.getElementById('kpi-aldia');
-        const kpiMora = document.getElementById('kpi-mora');
-        const kpiIngresos = document.getElementById('kpi-ingresos');
-
-        const totalCuentas = cuentas.length;
         const totalAldia = clientes.filter(c => c.estado === 'aldia').length;
-        const totalMorosos = clientes.filter(c => c.estado === 'moroso' || c.estado === 'vence-hoy').length; 
+        const totalMorosos = clientes.filter(c => c.estado === 'moroso' || c.estado === 'vence-hoy').length;
         const totalEsperado = clientes.reduce((acc, c) => acc + (parseFloat(c.montoPago) || 0), 0);
 
-        if (kpiMadres) kpiMadres.textContent = totalCuentas;
-        if (kpiAldia) kpiAldia.textContent = totalAldia;
-        if (kpiMora) kpiMora.textContent = totalMorosos;
-        if (kpiIngresos) kpiIngresos.textContent = `$${totalEsperado.toFixed(2)}`;
+        animarNumero($('kpi-madres'), cuentas.length, fmtEntero);
+        animarNumero($('kpi-aldia'), totalAldia, fmtEntero);
+        animarNumero($('kpi-mora'), totalMorosos, fmtEntero);
+        animarNumero($('kpi-ingresos'), totalEsperado, dinero);
 
         renderizarDashboardServicios();
         renderizarReportesFinancieros(totalEsperado);
-        
-        const contVenceHoy = document.getElementById('contenedor-vence-hoy');
-        const sectionVenceHoy = document.getElementById('section-vence-hoy');
-        if (contVenceHoy && sectionVenceHoy) {
-            const vencenHoy = clientes.filter(c => c.estado === 'vence-hoy');
-            if (vencenHoy.length > 0) {
-                sectionVenceHoy.classList.remove('vista-oculta');
-                contVenceHoy.innerHTML = vencenHoy.map(c => generarHTMLTarjetaCliente(c)).join('');
-            } else {
-                sectionVenceHoy.classList.add('vista-oculta');
-                contVenceHoy.innerHTML = '';
-            }
+
+        const contHoy = $('contenedor-vence-hoy'), secHoy = $('section-vence-hoy');
+        if (contHoy && secHoy) {
+            const lista = clientes.filter(c => c.estado === 'vence-hoy');
+            secHoy.classList.toggle('vista-oculta', lista.length === 0);
+            contHoy.innerHTML = lista.map(generarHTMLTarjetaCliente).join('');
         }
 
-        const contCuentasVencen = document.getElementById('contenedor-cuentas-vencen');
-        const sectionCuentasVencen = document.getElementById('section-cuentas-vencen');
-        if (contCuentasVencen && sectionCuentasVencen) {
-            const cuentasVencen = cuentas.filter(c => c.estado === 'por-vencer' || c.estado === 'vencida');
-            if (cuentasVencen.length > 0) {
-                sectionCuentasVencen.classList.remove('vista-oculta');
-                contCuentasVencen.innerHTML = cuentasVencen.map(c => {
-                    let fechaText = "Sin fecha";
-                    if(c.fechaVencimiento) {
-                        const f = new Date(c.fechaVencimiento);
-                        fechaText = `${String(f.getDate()).padStart(2, '0')}/${String(f.getMonth() + 1).padStart(2, '0')}/${f.getFullYear()}`;
-                    }
-
-                    return `
-                    <div class="cuenta-card ${c.estado === 'vencida' ? 'card-alerta' : ''}" style="margin-bottom: 15px; ${c.estado === 'por-vencer' ? 'border-left: 5px solid #F59E0B;' : ''}">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <h3 style="margin: 0; font-size: 1.1rem; color: #1F2937;"><i class="${c.icono}" style="color: ${c.color}; margin-right: 8px;"></i>${c.plataforma}</h3>
-                                <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: #6B7280;">${c.correo}</p>
-                                <p style="margin: 2px 0 0 0; font-size: 0.75rem; font-weight: bold; color: ${c.estado === 'vencida' ? '#EF4444' : '#F59E0B'};">
-                                    <i class="fa-regular fa-calendar" style="margin-right: 3px;"></i> Fecha: ${fechaText}
-                                </p>
+        const contVen = $('contenedor-cuentas-vencen'), secVen = $('section-cuentas-vencen');
+        if (contVen && secVen) {
+            const lista = cuentas.filter(c => c.estado === 'por-vencer' || c.estado === 'vencida');
+            secVen.classList.toggle('vista-oculta', lista.length === 0);
+            contVen.innerHTML = lista.map(c => {
+                const d = platDef(c.plataforma);
+                const vencida = c.estado === 'vencida';
+                return `
+                <article class="cuenta-card compact ${vencida ? 'tint-danger' : 'tint-warning'}">
+                    <div class="card-head">
+                        <div class="card-id">
+                            <div class="svc-icon" style="--c:${d.color}"><i class="${d.icono}"></i></div>
+                            <div style="min-width:0">
+                                <h3 class="card-name">${esc(c.plataforma)}</h3>
+                                <p class="svc-mail">${esc(c.correo)}</p>
                             </div>
-                            <span class="badge ${c.estado === 'vencida' ? 'badge-vencida' : 'badge-warning'}">${c.estado === 'vencida' ? 'Vencida' : 'Vence pronto'}</span>
                         </div>
+                        <span class="chip ${vencida ? 'chip--danger' : 'chip--warning'}"><i class="dot"></i>${vencida ? 'Vencida' : 'Vence pronto'}</span>
                     </div>
-                `}).join('');
-            } else {
-                sectionCuentasVencen.classList.add('vista-oculta');
-                contCuentasVencen.innerHTML = '';
-            }
+                    <p class="svc-date"><i class="fa-regular fa-calendar"></i> ${fechaCorta(c.fechaVencimiento)} <span class="rel">· ${textoDias(c.fechaVencimiento)}</span></p>
+                </article>`;
+            }).join('');
         }
 
         verificarAlertasAlEntrar();
     };
 
+    const renderizarDashboardServicios = () => {
+        const cont = $('contenedor-plataformas');
+        if (!cont) return;
+        cont.innerHTML = PLATAFORMAS.map(p => {
+            const madres = cuentas.filter(c => c.plataforma === p.nombre).length;
+            const perfiles = clientes.filter(c => c.servicioPlataforma === p.nombre).length;
+            const activo = madres > 0 || perfiles > 0;
+            return `
+            <div class="plat-card ${activo ? '' : 'plat-card--off'}">
+                <div class="plat-card__header">
+                    <div class="plat-ident">
+                        <div class="svc-icon" style="--c:${p.color}"><i class="${p.icono}"></i></div>
+                        <h3 class="plat-name">${esc(p.nombre)}</h3>
+                    </div>
+                    <span class="tag ${activo ? '' : 'tag--off'}">${activo ? 'Activo' : 'Sin stock'}</span>
+                </div>
+                <div class="plat-stats">
+                    <div><strong>${madres}</strong>Cuentas Madre</div>
+                    <div><strong>${perfiles}</strong>Perfiles vendidos</div>
+                </div>
+            </div>`;
+        }).join('');
+    };
+
     // ==========================================
-    // 9. REPORTES FINANCIEROS Y COSTOS
+    // 12. REPORTES FINANCIEROS
     // ==========================================
+    const calcularIngresoDiario = () => {
+        const input = $('filtro-fecha-diario'), out = $('total-diario');
+        if (!input || !out) return;
+        if (!input.value) input.value = aInputFecha(Date.now());
+        const [y, m, d] = input.value.split('-').map(Number);
+        const ini = new Date(y, m - 1, d, 0, 0, 0).getTime();
+        const fin = new Date(y, m - 1, d, 23, 59, 59, 999).getTime();
+        const total = historialPagos.filter(p => p.fecha >= ini && p.fecha <= fin).reduce((acc, p) => acc + p.monto, 0);
+        animarNumero(out, total, dinero);
+    };
+    $('filtro-fecha-diario')?.addEventListener('change', calcularIngresoDiario);
+
     const renderizarReportesFinancieros = (totalEsperado) => {
-        const calcularIngresoDiario = () => {
-            const inputFecha = document.getElementById('filtro-fecha-diario');
-            const totalDiarioEl = document.getElementById('total-diario');
-            if (!inputFecha || !totalDiarioEl) return;
-            if (!inputFecha.value) {
-                const hoy = new Date();
-                const yyyy = hoy.getFullYear();
-                const mm = String(hoy.getMonth() + 1).padStart(2, '0');
-                const dd = String(hoy.getDate()).padStart(2, '0');
-                inputFecha.value = `${yyyy}-${mm}-${dd}`;
-            }
-            const [year, month, day] = inputFecha.value.split('-');
-            const inicioDia = new Date(year, month - 1, day, 0, 0, 0).getTime();
-            const finDia = new Date(year, month - 1, day, 23, 59, 59, 999).getTime();
-
-            const totalDia = historialPagos
-                .filter(pago => pago.fecha >= inicioDia && pago.fecha <= finDia)
-                .reduce((acc, pago) => acc + pago.monto, 0);
-            totalDiarioEl.textContent = `$${totalDia.toFixed(2)}`;
-        };
-
-        const inputFechaGlobal = document.getElementById('filtro-fecha-diario');
-        if (inputFechaGlobal) inputFechaGlobal.addEventListener('change', calcularIngresoDiario);
-        
         const totalCobrado = clientes.filter(c => c.estado === 'aldia').reduce((acc, c) => acc + (parseFloat(c.montoPago) || 0), 0);
         const totalPendiente = totalEsperado - totalCobrado;
+        const totalProv = cuentas.reduce((acc, c) => acc + (parseFloat(costosProveedores[c.plataforma]) || 0), 0);
+        const ganancia = totalCobrado - totalProv;
 
-        let totalPagoProveedores = 0;
-        cuentas.forEach(cuenta => {
-            const costo = costosProveedores[cuenta.plataforma] || 0;
-            totalPagoProveedores += costo;
-        });
+        animarNumero($('rep-esperado'), totalEsperado, dinero);
+        animarNumero($('rep-cobrado'), totalCobrado, dinero);
+        animarNumero($('rep-pendiente'), totalPendiente, dinero);
+        animarNumero($('rep-proveedores'), totalProv, dinero);
+        animarNumero($('rep-proveedores-2'), totalProv, dinero);
+        animarNumero($('rep-ganancia'), ganancia, dinero);
+        animarNumero($('rep-ganancia-2'), ganancia, dinero);
 
-        const gananciaNeta = totalCobrado - totalPagoProveedores;
+        // Agrupado por mes
+        const agrupado = historialPagos.reduce((acc, p) => { acc[p.mes] = (acc[p.mes] || 0) + p.monto; return acc; }, {});
 
-        const repEsperado = document.getElementById('rep-esperado');
-        const repCobrado = document.getElementById('rep-cobrado');
-        const repPendiente = document.getElementById('rep-pendiente');
-        
-        const repProveedores1 = document.getElementById('rep-proveedores');
-        const repProveedores2 = document.getElementById('rep-proveedores-2');
-        const repGanancia1 = document.getElementById('rep-ganancia');
-        const repGanancia2 = document.getElementById('rep-ganancia-2');
-
-        if (repEsperado) repEsperado.textContent = `$${totalEsperado.toFixed(2)}`;
-        if (repCobrado) repCobrado.textContent = `$${totalCobrado.toFixed(2)}`;
-        if (repPendiente) repPendiente.textContent = `$${totalPendiente.toFixed(2)}`;
-        
-        if (repProveedores1) repProveedores1.textContent = `$${totalPagoProveedores.toFixed(2)}`;
-        if (repProveedores2) repProveedores2.textContent = `$${totalPagoProveedores.toFixed(2)}`;
-        if (repGanancia1) repGanancia1.textContent = `$${gananciaNeta.toFixed(2)}`;
-        if (repGanancia2) repGanancia2.textContent = `$${gananciaNeta.toFixed(2)}`;
-
-        const contHistorial = document.getElementById('contenedor-historial-meses');
-        if (contHistorial) {
-            const agrupadoMeses = historialPagos.reduce((acc, pago) => {
-                if (!acc[pago.mes]) acc[pago.mes] = 0;
-                acc[pago.mes] += pago.monto;
-                return acc;
-            }, {});
-            const nombresMeses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-            const mesesOrdenados = Object.keys(agrupadoMeses).sort((a, b) => b.localeCompare(a)); 
-
-            let htmlHistorial = '';
-            mesesOrdenados.forEach(mes => {
-                const [year, month] = mes.split('-');
-                const nombreMes = nombresMeses[parseInt(month) - 1];
-                htmlHistorial += `
-                    <div class="plat-card" style="display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #10B981;">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <div style="background: rgba(16, 185, 129, 0.1); padding: 12px; border-radius: 12px; color: #10B981; font-size: 1.2rem;">
-                                <i class="fa-solid fa-calendar-check"></i>
-                            </div>
-                            <div>
-                                <h3 style="margin: 0; font-size: 1.05rem; color: #1F2937;">${nombreMes} ${year}</h3>
-                                <p style="margin: 4px 0 0 0; font-size: 0.8rem; color: #6B7280;">Monto recaudado este mes</p>
-                            </div>
-                        </div>
-                        <h2 style="margin: 0; color: #10B981; font-size: 1.3rem;">$${agrupadoMeses[mes].toFixed(2)}</h2>
-                    </div>
-                `;
-            });
-            if (htmlHistorial === '') htmlHistorial = `<p style="grid-column: 1/-1; text-align: center; color: #9CA3AF; padding: 25px;">No hay ingresos registrados en el historial mensual aún.</p>`;
-            contHistorial.innerHTML = htmlHistorial;
+        // Gráfico últimos 6 meses
+        const graf = $('grafico-meses');
+        if (graf) {
+            const ahora = new Date();
+            const ult = [];
+            for (let i = 5; i >= 0; i--) {
+                const d = new Date(ahora.getFullYear(), ahora.getMonth() - i, 1);
+                ult.push({ lbl: MESES_CORTOS[d.getMonth()], total: agrupado[`${d.getFullYear()}-${pad(d.getMonth() + 1)}`] || 0 });
+            }
+            const max = Math.max(...ult.map(m => m.total), 1);
+            graf.innerHTML = ult.map(m => `
+                <div class="bar-col">
+                    <span class="bar-val">${m.total ? dinero(m.total) : ''}</span>
+                    <div class="bar-track"><div class="bar" style="height:${(m.total / max) * 100}%"></div></div>
+                    <span class="bar-lbl">${m.lbl}</span>
+                </div>`).join('');
         }
 
-        const contReportesPlat = document.getElementById('contenedor-reporte-plataformas');
-        if (contReportesPlat) {
-            contReportesPlat.innerHTML = '';
-            const plataformas = [
-                { nombre: 'Netflix', color: '#E50914', icono: 'fa-solid fa-play' },
-                { nombre: 'Max', color: '#002BE7', icono: 'fa-solid fa-tv' },
-                { nombre: 'Spotify Familiar', color: '#1DB954', icono: 'fa-brands fa-spotify' },
-                { nombre: 'Spotify Personal', color: '#1ED760', icono: 'fa-brands fa-spotify' },
-                { nombre: 'Disney+', color: '#113CCF', icono: 'fa-solid fa-star' },
-                { nombre: 'Crunchyroll', color: '#F47521', icono: 'fa-solid fa-fire' },
-                { nombre: 'YouTube Premium', color: '#FF0000', icono: 'fa-brands fa-youtube' },
-                { nombre: 'Canva', color: '#7D2AE8', icono: 'fa-solid fa-palette' },
-                { nombre: 'CapCut', color: '#00F2FE', icono: 'fa-solid fa-video' },
-                { nombre: 'Amazon Prime', color: '#00A8E1', icono: 'fa-brands fa-amazon' },
-                { nombre: 'IPTV', color: '#14B8A6', icono: 'fa-solid fa-satellite-dish' },
-                { nombre: 'ViX', color: '#FF1A75', icono: 'fa-solid fa-video' },
-                { nombre: 'Paramount+', color: '#0064FF', icono: 'fa-solid fa-mountain' },
-                { nombre: 'Gemini', color: '#A142F4', icono: 'fa-solid fa-sparkles' }
-            ];
-
-            let htmlPlat = '';
-            plataformas.forEach(plat => {
-                const clientesPlat = clientes.filter(c => c.servicioPlataforma === plat.nombre);
-                if (clientesPlat.length === 0) return; 
-
-                const platEsperado = clientesPlat.reduce((acc, c) => acc + (parseFloat(c.montoPago) || 0), 0);
-                const platCobrado = clientesPlat.filter(c => c.estado === 'aldia').reduce((acc, c) => acc + (parseFloat(c.montoPago) || 0), 0);
-                const porcentaje = platEsperado === 0 ? 0 : Math.round((platCobrado / platEsperado) * 100);
-
-                htmlPlat += `
-                    <div class="plat-card" style="display: flex; flex-direction: column; gap: 10px;">
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <i class="${plat.icono}" style="color: ${plat.color}; font-size: 1.5rem;"></i>
-                            <h3 style="margin: 0; font-size: 1.1rem; color: #1F2937;">${plat.nombre}</h3>
+        // Historial mensual
+        const contHist = $('contenedor-historial-meses');
+        if (contHist) {
+            const meses = Object.keys(agrupado).sort((a, b) => b.localeCompare(a));
+            contHist.innerHTML = meses.length ? meses.map(mes => {
+                const [y, m] = mes.split('-');
+                return `
+                <div class="plat-card hist-card">
+                    <div class="hist-card__left">
+                        <div class="hist-icon"><i class="fa-solid fa-calendar-check"></i></div>
+                        <div>
+                            <h3 class="plat-name">${MESES[parseInt(m, 10) - 1]} ${y}</h3>
+                            <p class="muted-sm">Monto recaudado este mes</p>
                         </div>
-                        <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 0.9rem;">
-                            <span style="color: #6B7280;">Cobrado: <strong style="color: #10B981;">$${platCobrado.toFixed(2)}</strong></span>
-                            <span style="color: #6B7280;">Total: <strong style="color: #1F2937;">$${platEsperado.toFixed(2)}</strong></span>
-                        </div>
-                        <div class="progress-bg">
-                            <div class="progress-bar" style="width: ${porcentaje}%; background-color: ${plat.color};"></div>
-                        </div>
-                        <span style="font-size: 0.75rem; text-align: right; color: #9CA3AF; font-weight: 700;">${porcentaje}% Recaudado</span>
                     </div>
-                `;
-            });
-            if (htmlPlat === '') htmlPlat = `<p style="grid-column: 1/-1; text-align: center; color: #9CA3AF; padding: 25px;">No hay ingresos activos registrados.</p>`;
-            contReportesPlat.innerHTML = htmlPlat;
+                    <span class="hist-amount">${dinero(agrupado[mes])}</span>
+                </div>`;
+            }).join('') : `<p class="empty"><i class="fa-regular fa-calendar"></i>No hay ingresos registrados en el historial mensual aún.</p>`;
         }
+
+        // Desglose por plataforma
+        const contPlat = $('contenedor-reporte-plataformas');
+        if (contPlat) {
+            let html = '';
+            PLATAFORMAS.forEach(p => {
+                const cp = clientes.filter(c => c.servicioPlataforma === p.nombre);
+                if (cp.length === 0) return;
+                const esperado = cp.reduce((acc, c) => acc + (parseFloat(c.montoPago) || 0), 0);
+                const cobrado = cp.filter(c => c.estado === 'aldia').reduce((acc, c) => acc + (parseFloat(c.montoPago) || 0), 0);
+                const costo = cuentas.filter(c => c.plataforma === p.nombre).length * (parseFloat(costosProveedores[p.nombre]) || 0);
+                const pct = esperado === 0 ? 0 : Math.round((cobrado / esperado) * 100);
+                html += `
+                <div class="plat-card">
+                    <div class="plat-ident">
+                        <div class="svc-icon" style="--c:${p.color}"><i class="${p.icono}"></i></div>
+                        <h3 class="plat-name">${esc(p.nombre)}</h3>
+                    </div>
+                    <div class="rep-line">
+                        <span>Cobrado: <strong style="color:#34D399">${dinero(cobrado)}</strong></span>
+                        <span>Total: <strong>${dinero(esperado)}</strong></span>
+                        <span>Ganancia: <strong>${dinero(cobrado - costo)}</strong></span>
+                    </div>
+                    <div class="progress-bg"><div class="progress-bar" style="width:${pct}%;background:${p.color}"></div></div>
+                    <span class="prog-text">${pct}% Recaudado</span>
+                </div>`;
+            });
+            contPlat.innerHTML = html || `<p class="empty"><i class="fa-solid fa-chart-pie"></i>No hay ingresos activos registrados.</p>`;
+        }
+
         calcularIngresoDiario();
     };
 
     // ==========================================
-    // 10. SERVICIOS ACTIVOS EN INICIO
-    // ==========================================
-    const contenedorPlataformas = document.getElementById('contenedor-plataformas');
-    const renderizarDashboardServicios = () => {
-        if (!contenedorPlataformas) return;
-        contenedorPlataformas.innerHTML = '';
-
-        const serviciosDef = [
-            { nombre: 'Netflix', color: '#E50914', icono: 'fa-solid fa-play' },
-            { nombre: 'Max', color: '#002BE7', icono: 'fa-solid fa-tv' },
-            { nombre: 'Spotify Familiar', color: '#1DB954', icono: 'fa-brands fa-spotify' },
-            { nombre: 'Spotify Personal', color: '#1ED760', icono: 'fa-brands fa-spotify' },
-            { nombre: 'Disney+', color: '#113CCF', icono: 'fa-solid fa-star' },
-            { nombre: 'Crunchyroll', color: '#F47521', icono: 'fa-solid fa-fire' },
-            { nombre: 'YouTube Premium', color: '#FF0000', icono: 'fa-brands fa-youtube' },
-            { nombre: 'Canva', color: '#7D2AE8', icono: 'fa-solid fa-palette' },
-            { nombre: 'CapCut', color: '#00F2FE', icono: 'fa-solid fa-video' },
-            { nombre: 'Amazon Prime', color: '#00A8E1', icono: 'fa-brands fa-amazon' },
-            { nombre: 'IPTV', color: '#14B8A6', icono: 'fa-solid fa-satellite-dish' },
-            { nombre: 'ViX', color: '#FF1A75', icono: 'fa-solid fa-video' },
-            { nombre: 'Paramount+', color: '#0064FF', icono: 'fa-solid fa-mountain' },
-            { nombre: 'Gemini', color: '#A142F4', icono: 'fa-solid fa-sparkles' }
-        ];
-
-        serviciosDef.forEach(serv => {
-            const madresCount = cuentas.filter(c => c.plataforma === serv.nombre).length;
-            const perfilesCount = clientes.filter(c => c.servicioPlataforma === serv.nombre).length;
-
-            const tarjeta = document.createElement('div');
-            tarjeta.className = 'plat-card';
-            tarjeta.innerHTML = `
-                <div class="plat-card__header">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <i class="${serv.icono}" style="color: ${serv.color}; font-size: 1.5rem;"></i>
-                        <h3 style="margin: 0; font-size: 1.1rem; color: #1F2937;">${serv.nombre}</h3>
-                    </div>
-                    <span class="plat-card__tag" style="background-color: ${serv.color}; color: white; padding: 4px 10px; border-radius: 20px; font-size: 0.7rem;">Activo</span>
-                </div>
-                <div class="plat-card__info" style="margin-top: 12px; color: #6B7280; font-size: 0.85rem;">
-                    <p style="margin: 0 0 4px 0;">Cuentas Madre: <strong style="color: #1F2937;">${madresCount}</strong></p>
-                    <p style="margin: 0;">Perfiles Vendidos: <strong style="color: #1F2937;">${perfilesCount}</strong></p>
-                </div>
-            `;
-            contenedorPlataformas.appendChild(tarjeta);
-        });
-    };
-
-    // ==========================================
-    // 11. GESTIÓN DE CUENTAS MADRE
+    // 13. CUENTAS MADRE
     // ==========================================
     const guardarYRenderizarCuentas = () => {
         guardarNube();
-        
-        const filtroCuentasActivo = document.querySelector('#vista-cuentas .btn-filtro.active');
-        const valFiltroCuentas = filtroCuentasActivo ? filtroCuentasActivo.getAttribute('data-filtro') : 'Todas';
-        const textoBusqCuentas = document.getElementById('buscador-cuentas')?.value || '';
-        
-        if (textoBusqCuentas.trim() !== '') {
-            renderizarCuentas(textoBusqCuentas);
-        } else {
-            renderizarCuentas(valFiltroCuentas === 'Todas' ? '' : valFiltroCuentas);
-        }
-        
+        renderizarCuentas();
         actualizarDashboard();
     };
 
-    const renderizarCuentas = function(filtro) {
-        filtro = filtro || '';
+    const clientesVinculados = (cuenta) => clientes.filter(cl =>
+        cl.servicioPlataforma === cuenta.plataforma &&
+        String(cl.servicioCorreo || '').toLowerCase() === String(cuenta.correo || '').toLowerCase());
+
+    const renderizarCuentas = () => {
         const grid = document.querySelector('#vista-cuentas .grid-cuentas');
         if (!grid) return;
-        grid.innerHTML = '';
 
-        const filtradas = cuentas.filter(function(c) {
-            return c.correo.toLowerCase().indexOf(filtro.toLowerCase()) !== -1 || c.plataforma.toLowerCase().indexOf(filtro.toLowerCase()) !== -1;
-        });
+        const texto = ($('buscador-cuentas')?.value || '').trim().toLowerCase();
+        const activo = document.querySelector('#filtros-cuentas .btn-filtro.active');
+        const filtro = activo ? activo.dataset.filtro : 'Todas';
 
-        if (filtradas.length === 0) {
-            grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: rgba(255,255,255,0.5); padding: 25px;">No hay cuentas con este filtro.</p>';
+        const lista = cuentas.filter(c => {
+            if (texto) return String(c.correo || '').toLowerCase().includes(texto) || c.plataforma.toLowerCase().includes(texto);
+            return filtro === 'Todas' || c.plataforma === filtro;
+        }).sort((a, b) => (a.fechaVencimiento || Infinity) - (b.fechaVencimiento || Infinity));
+
+        const resumen = $('resumen-cuentas');
+        if (resumen) {
+            const alertas = cuentas.filter(c => c.estado === 'por-vencer' || c.estado === 'vencida').length;
+            resumen.textContent = `${cuentas.length} cuenta(s) madre${alertas ? ` · ${alertas} por atender` : ''}`;
+        }
+
+        if (lista.length === 0) {
+            grid.innerHTML = `<p class="empty"><i class="fa-solid fa-box-open"></i>No hay cuentas con este filtro.</p>`;
             return;
         }
 
-        filtradas.forEach(function(c) {
-            const bgGradient = c.estado === 'vencida' ? 'bg-gradient-danger' : 
-                               c.estado === 'por-vencer' ? 'bg-gradient-warning' : 
-                               'bg-gradient-success';
-            const badgeTexto = c.estado === 'vencida' ? 'Vencida' : 
-                               c.estado === 'por-vencer' ? 'Por Vencer' : 'Al Día';
+        grid.innerHTML = lista.map(c => {
+            const d = platDef(c.plataforma);
+            const tint = c.estado === 'vencida' ? 'tint-danger' : c.estado === 'por-vencer' ? 'tint-warning' : 'tint-success';
+            const chip = c.estado === 'vencida' ? 'chip--danger' : c.estado === 'por-vencer' ? 'chip--warning' : 'chip--success';
+            const badge = c.estado === 'vencida' ? 'Vencida' : c.estado === 'por-vencer' ? 'Por vencer' : 'Al día';
+            const max = c.perfilesMax || 1;
+            const ocupados = Math.min(max, Math.max(c.perfilesOcupados || 0, clientesVinculados(c).length));
+            const pct = Math.round((ocupados / max) * 100);
+            const clave = c.contrasena || '';
 
-            let fechaText = "Sin fecha configurada";
-            if(c.fechaVencimiento) {
-                const f = new Date(c.fechaVencimiento);
-                let dStr = String(f.getDate()); if (dStr.length === 1) dStr = '0' + dStr;
-                let mStr = String(f.getMonth() + 1); if (mStr.length === 1) mStr = '0' + mStr;
-                fechaText = dStr + '/' + mStr + '/' + f.getFullYear();
-            }
+            return `
+            <article class="cuenta-card ${tint}">
+                <div class="card-head">
+                    <div class="card-id">
+                        <div class="svc-icon" style="--c:${d.color}"><i class="${d.icono}"></i></div>
+                        <h3 class="card-name">${esc(c.plataforma)}</h3>
+                    </div>
+                    <span class="chip ${chip}" style="margin-top:0"><i class="dot"></i>${badge}</span>
+                </div>
 
-            const html = `
-                <div class="cuenta-card ${bgGradient}">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.18);">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <div class="glass-icon-circle">
-                                <i class="${c.icono}"></i>
+                <div class="fields">
+                    <div class="field">
+                        <span class="field-label">Correo</span>
+                        <div class="field-row">
+                            <strong class="field-value">${esc(c.correo)}</strong>
+                            <div class="field-btns">
+                                <button class="icon-btn icon-btn--sm" type="button" data-accion="copiar" data-valor="${esc(c.correo)}" title="Copiar correo"><i class="fa-regular fa-copy"></i></button>
                             </div>
-                            <h3 style="margin: 0; font-size: 1.15rem; color: #fff; font-weight: 800;">${c.plataforma}</h3>
-                        </div>
-                        <span style="background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 8px; font-size: 0.7rem; font-weight: 800; color: #fff; border: 1px solid rgba(255,255,255,0.25); text-transform: uppercase;">${badgeTexto}</span>
-                    </div>
-                    <div style="color: rgba(255,255,255,0.9); font-size: 0.88rem; display: flex; flex-direction: column; gap: 8px;">
-                        <p style="margin: 0; font-weight: 500;">Correo: <strong style="color: #fff; display: block; font-size: 0.95rem; margin-top: 2px; word-break: break-all;">${c.correo}</strong></p>
-                        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 6px;">
-                            <p style="margin: 0; font-weight: 500;">Vencimiento:<br><strong style="color: #fff; font-weight: 700;">${fechaText}</strong></p>
-                            <p style="margin: 0; text-align: right; font-weight: 500;">Ocupados:<br><strong style="color: #fff; font-weight: 700;">${c.perfilesOcupados || 0} / ${c.perfilesMax}</strong></p>
                         </div>
                     </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; border-top: 1px solid rgba(255,255,255,0.18); padding-top: 14px;">
-                        <button class="glass-btn" type="button" onclick="abrirModalSubcuentas(${c.id})"><i class="fa-solid fa-users"></i> Gestionar</button>
-                        <div style="display: flex; gap: 8px;">
-                            <button class="glass-btn" type="button" onclick="abrirModalEditarCuenta(${c.id})" style="padding: 8px 12px;"><i class="fa-solid fa-pen"></i></button>
-                            <button class="glass-btn" type="button" onclick="abrirModalEliminar(${c.id})" style="padding: 8px 12px; background: rgba(239,68,68,0.3); border-color: rgba(239,68,68,0.5); color: #ff9999;"><i class="fa-solid fa-trash"></i></button>
+                    <div class="field">
+                        <span class="field-label">Contraseña</span>
+                        <div class="field-row">
+                            ${clave
+                                ? `<strong class="field-value pass-value" data-pass="${esc(clave)}">••••••••</strong>
+                                   <div class="field-btns">
+                                       <button class="icon-btn icon-btn--sm" type="button" data-accion="ver-pass" title="Mostrar / ocultar"><i class="fa-solid fa-eye"></i></button>
+                                       <button class="icon-btn icon-btn--sm" type="button" data-accion="copiar" data-valor="${esc(clave)}" title="Copiar contraseña"><i class="fa-regular fa-copy"></i></button>
+                                   </div>`
+                                : `<strong class="field-value muted">Sin contraseña guardada</strong>
+                                   <div class="field-btns"><button class="icon-btn icon-btn--sm" type="button" data-accion="editar-cuenta" data-id="${c.id}" title="Agregar contraseña"><i class="fa-solid fa-plus"></i></button></div>`}
                         </div>
                     </div>
                 </div>
-            `;
-            const wrapper = document.createElement('div');
-            wrapper.innerHTML = html;
-            grid.appendChild(wrapper.firstElementChild);
-        });
+
+                <div class="meta-row">
+                    <div>Vencimiento<b>${fechaCorta(c.fechaVencimiento)}</b><span class="rel">${textoDias(c.fechaVencimiento)}</span></div>
+                    <div>Ocupados<b>${ocupados} / ${max}</b></div>
+                </div>
+                <div class="occ-bar"><div class="occ-bar__fill" style="width:${pct}%"></div></div>
+
+                <div class="card-actions">
+                    <button class="glass-btn" type="button" data-accion="subcuentas" data-id="${c.id}"><i class="fa-solid fa-users"></i> Gestionar</button>
+                    <div class="push">
+                        <button class="icon-btn" type="button" data-accion="editar-cuenta" data-id="${c.id}" title="Editar"><i class="fa-solid fa-pen"></i></button>
+                        <button class="icon-btn icon-btn--danger" type="button" data-accion="eliminar-cuenta" data-id="${c.id}" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>
+            </article>`;
+        }).join('');
     };
 
-    const inputBuscadorCuentas = document.getElementById('buscador-cuentas');
-    const botonesFiltroCuentas = document.querySelectorAll('#vista-cuentas .btn-filtro');
-    if (inputBuscadorCuentas) {
-        inputBuscadorCuentas.addEventListener('input', (e) => {
-            renderizarCuentas(e.target.value);
-            botonesFiltroCuentas.forEach(b => b.classList.remove('active'));
+    // Filtros de cuentas (se generan desde PLATAFORMAS)
+    const filtrosCuentas = $('filtros-cuentas');
+    if (filtrosCuentas) {
+        filtrosCuentas.innerHTML = `<button class="btn-filtro active" data-filtro="Todas" type="button">Todas</button>` +
+            PLATAFORMAS.map(p => `<button class="btn-filtro" data-filtro="${esc(p.nombre)}" type="button"><i class="${p.icono}" style="color:${p.color}"></i> ${esc(p.nombre)}</button>`).join('');
+        filtrosCuentas.addEventListener('click', (e) => {
+            const b = e.target.closest('.btn-filtro'); if (!b) return;
+            filtrosCuentas.querySelectorAll('.btn-filtro').forEach(x => x.classList.remove('active'));
+            b.classList.add('active');
+            const buscador = $('buscador-cuentas'); if (buscador) buscador.value = '';
+            renderizarCuentas();
         });
     }
-
-    botonesFiltroCuentas.forEach(boton => {
-        boton.addEventListener('click', () => {
-            botonesFiltroCuentas.forEach(b => b.classList.remove('active'));
-            boton.classList.add('active');
-            if (inputBuscadorCuentas) inputBuscadorCuentas.value = '';
-            const filtroVal = boton.getAttribute('data-filtro');
-            renderizarCuentas(filtroVal === 'Todas' ? '' : filtroVal);
-        });
+    $('buscador-cuentas')?.addEventListener('input', (e) => {
+        const todas = filtrosCuentas?.querySelector('[data-filtro="Todas"]');
+        filtrosCuentas?.querySelectorAll('.btn-filtro').forEach(x => x.classList.remove('active'));
+        if (!e.target.value.trim() && todas) todas.classList.add('active');
+        renderizarCuentas();
     });
 
-    const modalAgregarId = 'modal-agregar-cuenta';
-    const formAgregarCuenta = document.getElementById('form-agregar-cuenta');
-    
-    document.getElementById('btn-agregar-cuenta')?.addEventListener('click', () => {
-        const duracionSelectC = document.getElementById('nuevo-duracion-cuenta');
-        if (duracionSelectC) {
-            duracionSelectC.value = '1m';
-            duracionSelectC.dispatchEvent(new Event('change'));
-        }
-        toggleModal(modalAgregarId, true);
+    // Selects de plataforma (se generan desde PLATAFORMAS)
+    const opcionesPlat = PLATAFORMAS.map(p => `<option value="${esc(p.nombre)}">${esc(p.nombre)}</option>`).join('');
+    if ($('nuevo-plataforma')) $('nuevo-plataforma').innerHTML = opcionesPlat;
+    if ($('cliente-plataforma')) $('cliente-plataforma').innerHTML = opcionesPlat;
+
+    // ----- Duración -> fecha (cliente y cuenta) -----
+    const enlazarDuracion = (idSelect, idFecha) => {
+        const sel = $(idSelect), fecha = $(idFecha);
+        if (!sel || !fecha) return;
+        sel.addEventListener('change', () => {
+            if (sel.value === 'custom') return;
+            fecha.value = aInputFecha(sumarDuracion(new Date(), sel.value));
+        });
+        fecha.addEventListener('input', () => { sel.value = 'custom'; });
+    };
+    enlazarDuracion('cliente-duracion', 'cliente-fecha-vencimiento');
+    enlazarDuracion('nuevo-duracion-cuenta', 'nuevo-vencimiento-cuenta');
+
+    // ----- Ojito para ver contraseñas en formularios -----
+    document.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-toggle-pass]');
+        if (!b) return;
+        const input = b.parentElement.querySelector('input');
+        if (!input) return;
+        const mostrar = input.type === 'password';
+        input.type = mostrar ? 'text' : 'password';
+        b.innerHTML = `<i class="fa-solid ${mostrar ? 'fa-eye-slash' : 'fa-eye'}"></i>`;
     });
-    
-    document.getElementById('cerrar-modal-agregar')?.addEventListener('click', () => toggleModal(modalAgregarId, false));
-    
-    const selectNuevoPlat = document.getElementById('nuevo-plataforma');
-    const inputNuevoPerfiles = document.getElementById('nuevo-perfiles');
-    if(selectNuevoPlat && inputNuevoPerfiles) {
-        selectNuevoPlat.addEventListener('change', (e) => {
-            if (e.target.value === 'Spotify Personal') {
-                inputNuevoPerfiles.value = 1;
-                inputNuevoPerfiles.setAttribute('readonly', 'true');
-            } else {
-                inputNuevoPerfiles.removeAttribute('readonly');
-            }
+
+    // ----- Agregar cuenta madre -----
+    const formAgregarCuenta = $('form-agregar-cuenta');
+    $('btn-agregar-cuenta')?.addEventListener('click', () => {
+        formAgregarCuenta.reset();
+        const sel = $('nuevo-duracion-cuenta');
+        sel.value = '1m';
+        sel.dispatchEvent(new Event('change'));
+        $('nuevo-perfiles').removeAttribute('readonly');
+        const pass = $('nuevo-contrasena');
+        pass.type = 'password';
+        pass.parentElement.querySelector('[data-toggle-pass]').innerHTML = '<i class="fa-solid fa-eye"></i>';
+        toggleModal('modal-agregar-cuenta', true);
+    });
+    $('cerrar-modal-agregar')?.addEventListener('click', () => toggleModal('modal-agregar-cuenta', false));
+
+    $('nuevo-plataforma')?.addEventListener('change', (e) => {
+        const inp = $('nuevo-perfiles');
+        if (e.target.value === 'Spotify Personal') { inp.value = 1; inp.setAttribute('readonly', 'true'); }
+        else inp.removeAttribute('readonly');
+    });
+
+    formAgregarCuenta?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const plataforma = $('nuevo-plataforma').value;
+        const d = platDef(plataforma);
+        let perfilesMax = parseInt($('nuevo-perfiles').value, 10) || 5;
+        if (plataforma === 'Spotify Personal') perfilesMax = 1;
+
+        const subcuentas = [];
+        for (let i = 0; i < perfilesMax; i++) subcuentas.push({ nombre: '', correoPerfil: '' });
+
+        cuentas.push({
+            id: Date.now(),
+            plataforma,
+            icono: d.icono,
+            color: d.color,
+            correo: $('nuevo-correo').value.trim(),
+            contrasena: $('nuevo-contrasena').value,
+            perfilesMax,
+            perfilesOcupados: 0,
+            estado: 'aldia',
+            fechaVencimiento: desdeInputFecha($('nuevo-vencimiento-cuenta').value),
+            subcuentas
         });
-    }
 
-    if (formAgregarCuenta) {
-        formAgregarCuenta.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const inputCorreoObj = document.getElementById('nuevo-correo');
-            const correoGuardado = inputCorreoObj ? inputCorreoObj.value.trim() : 'Sin Correo';
-            const plataforma = document.getElementById('nuevo-plataforma').value;
-            const estadoInicial = document.getElementById('nuevo-estado')?.value || 'aldia';
-            
-            let perfilesMax = parseInt(document.getElementById('nuevo-perfiles').value) || 5;
-            if (plataforma === 'Spotify Personal') perfilesMax = 1; 
+        guardarYRenderizarCuentas();
+        toggleModal('modal-agregar-cuenta', false);
+        mostrarNotificacion('¡Cuenta Madre guardada con éxito!');
+    });
 
-            const inputFecha = document.getElementById('nuevo-vencimiento-cuenta')?.value;
-            let fechaManual = null;
-            if(inputFecha) {
-                const [year, month, day] = inputFecha.split('-');
-                fechaManual = new Date(year, month - 1, day, 23, 59, 59).getTime();
-            }
-
-            let icono = 'fa-solid fa-play'; let color = '#E50914';
-            if (plataforma.includes('Spotify')) { icono = 'fa-brands fa-spotify'; color = '#1DB954'; }
-            else if (plataforma === 'Max') { icono = 'fa-solid fa-tv'; color = '#002BE7'; }
-            else if (plataforma === 'Disney+') { icono = 'fa-solid fa-star'; color = '#113CCF'; }
-            else if (plataforma === 'Crunchyroll') { icono = 'fa-solid fa-fire'; color = '#F47521'; }
-            else if (plataforma === 'YouTube Premium') { icono = 'fa-brands fa-youtube'; color = '#FF0000'; }
-            else if (plataforma === 'Canva') { icono = 'fa-solid fa-palette'; color = '#7D2AE8'; }
-            else if (plataforma === 'CapCut') { icono = 'fa-solid fa-video'; color = '#00F2FE'; }
-            else if (plataforma === 'Amazon Prime') { icono = 'fa-brands fa-amazon'; color = '#00A8E1'; }
-            else if (plataforma === 'IPTV') { icono = 'fa-solid fa-satellite-dish'; color = '#14B8A6'; }
-            else if (plataforma === 'ViX') { icono = 'fa-solid fa-video'; color = '#FF1A75'; }
-            else if (plataforma === 'Paramount+') { icono = 'fa-solid fa-mountain'; color = '#0064FF'; }
-            else if (plataforma === 'Gemini') { icono = 'fa-solid fa-sparkles'; color = '#A142F4'; }
-
-            const subcuentasIniciales = [];
-            for (let i = 0; i < perfilesMax; i++) subcuentasIniciales.push({ nombre: '', correoPerfil: '' });
-
-            const nuevaCuenta = {
-                id: Date.now(), plataforma: plataforma, icono: icono, color: color,
-                correo: correoGuardado, perfilesMax: perfilesMax, perfilesOcupados: 0,
-                estado: estadoInicial,
-                fechaVencimiento: fechaManual, subcuentas: subcuentasIniciales
-            };
-
-            cuentas.push(nuevaCuenta);
-            guardarYRenderizarCuentas(); 
-            toggleModal(modalAgregarId, false);
-            formAgregarCuenta.reset();
-            mostrarNotificacion('¡Cuenta Madre guardada con éxito!');
-        });
-    }
-
+    // ----- Eliminar cuenta -----
     let cuentaAEliminar = null;
-    const modalEliminarId = 'modal-eliminar';
-    window.abrirModalEliminar = function(id) { cuentaAEliminar = id; toggleModal(modalEliminarId, true); };
-    document.getElementById('btn-cancelar-eliminar')?.addEventListener('click', () => { toggleModal(modalEliminarId, false); cuentaAEliminar = null; });
-    document.getElementById('btn-confirmar-eliminar')?.addEventListener('click', () => {
-        if (cuentaAEliminar) {
-            cuentas = cuentas.filter(c => c.id !== cuentaAEliminar);
-            guardarYRenderizarCuentas();
-            toggleModal(modalEliminarId, false);
-            mostrarNotificacion('Cuenta eliminada', 'info');
-        }
+    $('btn-cancelar-eliminar')?.addEventListener('click', () => { toggleModal('modal-eliminar', false); cuentaAEliminar = null; });
+    $('btn-confirmar-eliminar')?.addEventListener('click', () => {
+        if (cuentaAEliminar === null) return;
+        cuentas = cuentas.filter(c => c.id !== cuentaAEliminar);
+        cuentaAEliminar = null;
+        guardarYRenderizarCuentas();
+        toggleModal('modal-eliminar', false);
+        mostrarNotificacion('Cuenta eliminada', 'info');
     });
 
+    // ----- Subcuentas -----
     let cuentaEnEdicionId = null;
-    const modalSubId = 'modal-subcuentas';
-    document.getElementById('cerrar-modal-sub')?.addEventListener('click', () => toggleModal(modalSubId, false));
+    $('cerrar-modal-sub')?.addEventListener('click', () => toggleModal('modal-subcuentas', false));
 
-    window.abrirModalSubcuentas = function(idCuenta) {
+    const abrirModalSubcuentas = (idCuenta) => {
         const cuenta = cuentas.find(c => c.id === idCuenta);
         if (!cuenta) return;
         cuentaEnEdicionId = cuenta.id;
-        toggleModal(modalSubId, true);
-        const correoRef = document.getElementById('modal-correo-ref');
-        if (correoRef) correoRef.textContent = `${cuenta.plataforma} — ${cuenta.correo}`;
+        $('modal-correo-ref').textContent = `${cuenta.plataforma} — ${cuenta.correo}`;
 
-        if (!cuenta.subcuentas || cuenta.subcuentas.length !== cuenta.perfilesMax) {
-            cuenta.subcuentas = [];
-            for (let i = 1; i <= cuenta.perfilesMax; i++) cuenta.subcuentas.push({ nombre: '', correoPerfil: '' });
-        }
+        // Conserva lo ya escrito: solo completa o recorta
+        const prev = Array.isArray(cuenta.subcuentas) ? cuenta.subcuentas : [];
+        cuenta.subcuentas = [];
+        for (let i = 0; i < cuenta.perfilesMax; i++) cuenta.subcuentas.push(prev[i] || { nombre: '', correoPerfil: '' });
 
-        const contenedorListaPerfiles = document.getElementById('contenedor-lista-perfiles');
-        if (contenedorListaPerfiles) {
-            contenedorListaPerfiles.innerHTML = '';
-            cuenta.subcuentas.forEach((sub, index) => {
-                const perfilDiv = document.createElement('div');
-                perfilDiv.className = 'perfil-item-box';
-                perfilDiv.style.cssText = 'background: #F9FAFB; padding: 12px; border-radius: 12px; border: 1px solid #E5E7EB; display: flex; flex-direction: column; gap: 8px;';
-                
-                perfilDiv.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 700; font-size: 0.85rem; color: #374151;">Perfil ${index + 1}</span>
-                        <span style="font-size: 0.75rem; color: #9CA3AF;">Slot ${index + 1} de ${cuenta.perfilesMax}</span>
-                    </div>
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <input type="text" class="input-nombre-perfil" placeholder="Nombre del cliente" value="${sub.nombre || ''}" style="flex: 1; min-width: 140px; padding: 8px; border-radius: 8px; border: 1px solid #D1D5DB; font-size: 0.85rem; color: #1F2937; outline: none;">
-                        <input type="text" class="input-correo-perfil" placeholder="Correo o PIN" value="${sub.correoPerfil || ''}" style="flex: 1; min-width: 140px; padding: 8px; border-radius: 8px; border: 1px solid #D1D5DB; font-size: 0.85rem; color: #1F2937; outline: none;">
-                    </div>
-                `;
-                contenedorListaPerfiles.appendChild(perfilDiv);
-            });
-        }
+        $('contenedor-lista-perfiles').innerHTML = cuenta.subcuentas.map((sub, i) => `
+            <div class="perfil-item">
+                <div class="perfil-item__head"><span>Perfil ${i + 1}</span><span>Slot ${i + 1} de ${cuenta.perfilesMax}</span></div>
+                <div class="perfil-item__inputs">
+                    <input type="text" class="input-nombre-perfil" placeholder="Nombre del cliente" value="${esc(sub.nombre)}">
+                    <input type="text" class="input-correo-perfil" placeholder="Correo o PIN" value="${esc(sub.correoPerfil)}">
+                </div>
+            </div>`).join('');
+        toggleModal('modal-subcuentas', true);
     };
 
-    document.getElementById('btn-guardar-cambios-subcuentas')?.addEventListener('click', () => {
-        if (!cuentaEnEdicionId) return;
+    $('btn-guardar-cambios-subcuentas')?.addEventListener('click', () => {
         const cuenta = cuentas.find(c => c.id === cuentaEnEdicionId);
         if (!cuenta) return;
-
-        const contenedorListaPerfiles = document.getElementById('contenedor-lista-perfiles');
-        const itemsPerfiles = contenedorListaPerfiles.querySelectorAll('.perfil-item-box');
-        let ocupadosCount = 0;
-
+        let ocupados = 0;
         cuenta.subcuentas = [];
-        itemsPerfiles.forEach(item => {
-            const cajaNombre = item.querySelector('.input-nombre-perfil');
-            const cajaCorreo = item.querySelector('.input-correo-perfil');
-            const nombreGuardado = cajaNombre ? cajaNombre.value.trim() : '';
-            const correoPerfilGuardado = cajaCorreo ? cajaCorreo.value.trim() : '';
-            
-            cuenta.subcuentas.push({ nombre: nombreGuardado, correoPerfil: correoPerfilGuardado });
-            if (nombreGuardado !== '') ocupadosCount++;
+        document.querySelectorAll('#contenedor-lista-perfiles .perfil-item').forEach(item => {
+            const nombre = item.querySelector('.input-nombre-perfil').value.trim();
+            const correoPerfil = item.querySelector('.input-correo-perfil').value.trim();
+            cuenta.subcuentas.push({ nombre, correoPerfil });
+            if (nombre !== '') ocupados++;
         });
-
-        cuenta.perfilesOcupados = ocupadosCount;
+        cuenta.perfilesOcupados = ocupados;
         guardarYRenderizarCuentas();
-        toggleModal(modalSubId, false);
-        mostrarNotificacion('Perfiles actualizados', 'success');
+        toggleModal('modal-subcuentas', false);
+        mostrarNotificacion('Perfiles actualizados');
     });
 
-    const modalEditarCuentaId = 'modal-editar-cuenta';
-    const formEditarCuenta = document.getElementById('form-editar-cuenta');
-    document.getElementById('cerrar-modal-editar-cuenta')?.addEventListener('click', () => toggleModal(modalEditarCuentaId, false));
+    // ----- Editar cuenta madre (correo + contraseña + fecha) -----
+    const formEditarCuenta = $('form-editar-cuenta');
+    $('cerrar-modal-editar-cuenta')?.addEventListener('click', () => toggleModal('modal-editar-cuenta', false));
 
-    window.abrirModalEditarCuenta = function(id) {
+    const abrirModalEditarCuenta = (id) => {
         const cuenta = cuentas.find(c => c.id === id);
         if (!cuenta) return;
-        document.getElementById('edit-cuenta-id').value = cuenta.id;
-        document.getElementById('edit-cuenta-correo').value = cuenta.correo;
-
-        if (cuenta.fechaVencimiento) {
-            const fd = new Date(cuenta.fechaVencimiento);
-            const yyyy = fd.getFullYear();
-            const mm = String(fd.getMonth() + 1).padStart(2, '0');
-            const dd = String(fd.getDate()).padStart(2, '0');
-            const inputVenc = document.getElementById('edit-cuenta-vencimiento');
-            if(inputVenc) inputVenc.value = `${yyyy}-${mm}-${dd}`;
-        }
-
-        toggleModal(modalEditarCuentaId, true);
+        $('edit-cuenta-id').value = cuenta.id;
+        $('edit-cuenta-ref').textContent = `${cuenta.plataforma} — ${cuenta.correo}`;
+        $('edit-cuenta-correo').value = cuenta.correo || '';
+        const pass = $('edit-cuenta-contrasena');
+        pass.value = cuenta.contrasena || '';
+        pass.type = 'password';
+        pass.parentElement.querySelector('[data-toggle-pass]').innerHTML = '<i class="fa-solid fa-eye"></i>';
+        $('edit-cuenta-vencimiento').value = cuenta.fechaVencimiento ? aInputFecha(cuenta.fechaVencimiento) : '';
+        $('edit-cuenta-propagar').checked = false;
+        $('edit-cuenta-notificar').checked = false;
+        // Las plataformas por invitación no usan contraseña con el cliente
+        $('grupo-propagar').style.display = platDef(cuenta.plataforma).sinClave ? 'none' : 'flex';
+        toggleModal('modal-editar-cuenta', true);
     };
 
-    const modalNotificacionId = 'modal-notificacion-masiva';
-    document.getElementById('cerrar-modal-notificacion')?.addEventListener('click', () => toggleModal(modalNotificacionId, false));
-
-    if (formEditarCuenta) {
-        formEditarCuenta.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const id = parseInt(document.getElementById('edit-cuenta-id').value);
-            const nuevoCorreo = document.getElementById('edit-cuenta-correo').value.trim();
-            const fechaInput = document.getElementById('edit-cuenta-vencimiento')?.value;
-
-            const cuenta = cuentas.find(c => c.id === id);
-            if (!cuenta) return;
-
-            const correoViejo = cuenta.correo;
-            cuenta.correo = nuevoCorreo;
-            
-            if(fechaInput) {
-                const [year, month, day] = fechaInput.split('-');
-                cuenta.fechaVencimiento = new Date(year, month - 1, day, 23, 59, 59).getTime();
-            }
-
-            guardarYRenderizarCuentas(); 
-
-            const clientesAfectados = clientes.filter(c => c.servicioCorreo.toLowerCase() === correoViejo.toLowerCase() && c.servicioPlataforma === cuenta.plataforma);
-            
-            if (clientesAfectados.length > 0) {
-                clientesAfectados.forEach(c => c.servicioCorreo = nuevoCorreo);
-                guardarYRenderizarClientes();
-                toggleModal(modalEditarCuentaId, false);
-                abrirModalNotificacionMasiva(clientesAfectados, cuenta.plataforma, nuevoCorreo);
-            } else {
-                toggleModal(modalEditarCuentaId, false);
-                mostrarNotificacion('Cuenta actualizada. No hay clientes vinculados a este correo.', 'success');
-            }
-        });
-    }
-
-    window.abrirModalNotificacionMasiva = function(clientesAfectados, plataforma, nuevoCorreo) {
-        const contenedor = document.getElementById('lista-clientes-notificar');
-        if (!contenedor) return;
-        contenedor.innerHTML = '';
+    const abrirModalNotificacionMasiva = (afectados, plataforma, cambioCorreo, cambioClave) => {
+        const cont = $('lista-clientes-notificar');
+        if (!cont) return;
+        const partes = [];
+        if (cambioCorreo) partes.push('el correo');
+        if (cambioClave) partes.push('la contraseña');
         
-        clientesAfectados.forEach(c => {
-            const mensaje = `Hola ${c.nombre}!\n\nTe informamos que por motivos de mantenimiento hemos actualizado el correo de acceso para tu cuenta de *${plataforma}*:\n\n• *Nuevo Correo:* ${nuevoCorreo}\n• *Contraseña/PIN:* ${c.contrasena || 'La misma que ya tenías'}\n• *Perfil:* ${c.servicioDetalle}\n\nPor favor, utiliza este nuevo correo para iniciar sesión a partir de ahora. ¡Gracias por tu comprensión!`;
-            const urlWa = `https://api.whatsapp.com/send?phone=${c.telefono}&text=${encodeURIComponent(mensaje)}`;
+        let textoNotif = 'Toca "Notificar" para enviar los datos de acceso a cada cliente vinculado.';
+        if (partes.length > 0) {
+            textoNotif = `Se actualizó ${partes.join(' y ')}. ` + textoNotif;
+        }
+        $('texto-notificacion-masiva').textContent = textoNotif;
+
+        cont.innerHTML = afectados.map(c => {
+            const lineas = [
+                `• *Correo:* ${c.servicioCorreo}`,
+                `• *Contraseña/PIN:* ${c.contrasena || 'La misma que ya tenías'}`,
+                `• *Perfil:* ${c.servicioDetalle}`
+            ].join('\n');
             
-            const item = document.createElement('div');
-            item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; background: #F9FAFB; padding: 12px; border-radius: 10px; border: 1px solid #E5E7EB;';
-            item.innerHTML = `
-                <div>
-                    <strong style="color: #1F2937; display: block; font-size: 0.9rem;">${c.nombre}</strong>
-                    <span style="color: #6B7280; font-size: 0.8rem;">Perfil: ${c.servicioDetalle}</span>
-                </div>
-                <a href="${urlWa}" target="_blank" onclick="this.style.backgroundColor='#E5E7EB'; this.style.color='#9CA3AF'; this.innerHTML='<i class=\\'fa-solid fa-check\\'></i> Listo';" style="background: #25D366; color: white; padding: 8px 12px; border-radius: 8px; text-decoration: none; font-size: 0.85rem; font-weight: bold; display: flex; align-items: center; gap: 6px; transition: 0.2s;">
-                    <i class="fa-brands fa-whatsapp"></i> Notificar
-                </a>
-            `;
-            contenedor.appendChild(item);
-        });
-        toggleModal(modalNotificacionId, true);
+            const intro = partes.length > 0 
+                ? `Te informamos que por motivos de mantenimiento hemos actualizado los datos de acceso de tu cuenta de *${plataforma}*:`
+                : `Te compartimos los datos de acceso actualizados de tu cuenta de *${plataforma}*:`;
+
+            const mensaje = `Hola ${c.nombre}!\n\n${intro}\n\n${lineas}\n\nPor favor, utiliza estos datos para iniciar sesión a partir de ahora. ¡Gracias por tu comprensión!`;
+            
+            return `
+            <div class="notify-item">
+                <div><strong>${esc(c.nombre)}</strong><span>Perfil: ${esc(c.servicioDetalle)}</span></div>
+                <a class="btn-wa-mini" href="${urlWhatsApp(c.telefono, mensaje)}" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp"></i> Notificar</a>
+            </div>`;
+        }).join('');
+        toggleModal('modal-notificacion-masiva', true);
     };
+    $('cerrar-modal-notificacion')?.addEventListener('click', () => toggleModal('modal-notificacion-masiva', false));
+    $('lista-clientes-notificar')?.addEventListener('click', (e) => {
+        const a = e.target.closest('.btn-wa-mini'); if (!a) return;
+        a.classList.add('done');
+        a.innerHTML = '<i class="fa-solid fa-check"></i> Listo';
+    });
+
+    formEditarCuenta?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const id = parseInt($('edit-cuenta-id').value, 10);
+        const cuenta = cuentas.find(c => c.id === id);
+        if (!cuenta) return;
+
+        const nuevoCorreo = $('edit-cuenta-correo').value.trim();
+        const nuevaClave = $('edit-cuenta-contrasena').value;
+        const fechaInput = $('edit-cuenta-vencimiento').value;
+        const propagar = $('edit-cuenta-propagar').checked && !platDef(cuenta.plataforma).sinClave;
+        const forzarNotificacion = $('edit-cuenta-notificar').checked;
+
+        const correoViejo = cuenta.correo || '';
+        const claveVieja = cuenta.contrasena || '';
+        const cambioCorreo = nuevoCorreo.toLowerCase() !== correoViejo.toLowerCase();
+        const cambioClave = nuevaClave !== claveVieja;
+
+        // Clientes vinculados (se buscan con el correo VIEJO)
+        const afectados = clientes.filter(c =>
+            String(c.servicioCorreo || '').toLowerCase() === correoViejo.toLowerCase() && c.servicioPlataforma === cuenta.plataforma);
+
+        cuenta.correo = nuevoCorreo;
+        cuenta.contrasena = nuevaClave;
+        if (fechaInput) cuenta.fechaVencimiento = desdeInputFecha(fechaInput);
+
+        const propagarClave = propagar && cambioClave;
+        if (cambioCorreo) afectados.forEach(c => { c.servicioCorreo = nuevoCorreo; });
+        if (propagarClave) afectados.forEach(c => { c.contrasena = nuevaClave; });
+
+        guardarYRenderizarCuentas();
+        if (afectados.length) guardarYRenderizarClientes();
+        toggleModal('modal-editar-cuenta', false);
+
+        if (afectados.length && (cambioCorreo || propagarClave || forzarNotificacion)) {
+            abrirModalNotificacionMasiva(afectados, cuenta.plataforma, cambioCorreo, propagarClave);
+        } else {
+            mostrarNotificacion(afectados.length ? 'Cuenta actualizada' : 'Cuenta actualizada. No hay clientes vinculados a este correo.');
+        }
+    });
 
     // ==========================================
-    // 12. GESTIÓN DE CLIENTES
+    // 14. CLIENTES
     // ==========================================
     const guardarYRenderizarClientes = () => {
         guardarNube();
-        const filtroActivo = document.querySelector('#vista-clientes .btn-filtro.active');
-        const filtroVal = filtroActivo ? filtroActivo.getAttribute('data-filtro') : 'todos';
-        renderizarClientes(filtroVal);
+        renderizarClientes();
         actualizarDashboard();
     };
 
-    const renderizarClientes = (filtroEstado = 'todos') => {
+    const ORDEN_ESTADO = { 'moroso': 0, 'vence-hoy': 1, 'aldia': 2 };
+
+    const renderizarClientes = () => {
         verificarVencimientosClientes();
-        const grid = document.querySelector('#vista-clientes .grid-clientes'); 
+        const grid = document.querySelector('#vista-clientes .grid-clientes');
         if (!grid) return;
-        
-        const textoBusqueda = (document.getElementById('buscador-clientes')?.value || '').toLowerCase();
-        
-        let filtrados = clientes.filter(c => {
-            const coincideBusqueda = c.nombre.toLowerCase().includes(textoBusqueda) || 
-                                     c.servicioCorreo.toLowerCase().includes(textoBusqueda) ||
-                                     (c.correoPersonal && c.correoPersonal.toLowerCase().includes(textoBusqueda));
-            const coincideEstado = filtroEstado === 'todos' || 
-                                  (filtroEstado === 'aldia' && c.estado === 'aldia') || 
-                                  (filtroEstado === 'vencidos' && (c.estado === 'moroso' || c.estado === 'vence-hoy'));
-            return coincideBusqueda && coincideEstado;
+
+        const texto = ($('buscador-clientes')?.value || '').toLowerCase();
+        const activo = document.querySelector('#filtros-clientes .btn-filtro.active');
+        const filtroEstado = activo ? activo.dataset.filtro : 'todos';
+
+        const lista = clientes.filter(c => {
+            const busca = !texto || [c.nombre, c.servicioCorreo, c.correoPersonal, c.servicioPlataforma, c.servicioDetalle, c.telefono]
+                .some(v => String(v || '').toLowerCase().includes(texto));
+            const estado = filtroEstado === 'todos' ||
+                (filtroEstado === 'aldia' && c.estado === 'aldia') ||
+                (filtroEstado === 'vencidos' && (c.estado === 'moroso' || c.estado === 'vence-hoy'));
+            return busca && estado;
+        }).sort((a, b) => {
+            const o = (ORDEN_ESTADO[a.estado] ?? 3) - (ORDEN_ESTADO[b.estado] ?? 3);
+            return o !== 0 ? o : (a.fechaVencimiento || 0) - (b.fechaVencimiento || 0);
         });
 
-        if (filtrados.length === 0) {
-            grid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #9CA3AF; padding: 25px;">No se encontraron clientes registrados.</p>`;
-            return;
+        const resumen = $('resumen-clientes');
+        if (resumen) {
+            const porCobrar = clientes.filter(c => c.estado === 'moroso' || c.estado === 'vence-hoy').length;
+            resumen.textContent = `${clientes.length} cliente(s)${porCobrar ? ` · ${porCobrar} por cobrar` : ''}`;
         }
-        
-        grid.innerHTML = filtrados.map(c => generarHTMLTarjetaCliente(c)).join('');
+
+        grid.innerHTML = lista.length
+            ? lista.map(generarHTMLTarjetaCliente).join('')
+            : `<p class="empty"><i class="fa-regular fa-user"></i>No se encontraron clientes registrados.</p>`;
     };
 
-    const inputBuscadorClientes = document.getElementById('buscador-clientes');
-    const botonesFiltroClientes = document.querySelectorAll('#vista-clientes .btn-filtro');
-    if (inputBuscadorClientes) {
-        inputBuscadorClientes.addEventListener('input', () => {
-            const activo = document.querySelector('#vista-clientes .btn-filtro.active');
-            renderizarClientes(activo ? activo.getAttribute('data-filtro') : 'todos');
-        });
-    }
-    botonesFiltroClientes.forEach(boton => {
-        boton.addEventListener('click', () => {
-            botonesFiltroClientes.forEach(b => b.classList.remove('active'));
-            boton.classList.add('active');
-            if (inputBuscadorClientes) inputBuscadorClientes.value = '';
-            renderizarClientes(boton.getAttribute('data-filtro'));
-        });
+    $('buscador-clientes')?.addEventListener('input', renderizarClientes);
+    $('filtros-clientes')?.addEventListener('click', (e) => {
+        const b = e.target.closest('.btn-filtro'); if (!b) return;
+        document.querySelectorAll('#filtros-clientes .btn-filtro').forEach(x => x.classList.remove('active'));
+        b.classList.add('active');
+        const buscador = $('buscador-clientes'); if (buscador) buscador.value = '';
+        renderizarClientes();
     });
 
-    const selectPlataforma = document.getElementById('cliente-plataforma');
-    const grupoCorreoPersonal = document.getElementById('grupo-correo-personal');
-    const grupoEnlaceIptv = document.getElementById('grupo-enlace-iptv'); 
-    const inputContrasena = document.getElementById('cliente-contrasena');
-    const inputCorreoBase = document.getElementById('cliente-correo');
+    // ----- Formulario adaptable según plataforma -----
+    const selectPlataforma = $('cliente-plataforma');
+    const inputContrasena = $('cliente-contrasena');
+    const inputCorreoBase = $('cliente-correo');
 
-    const adaptarFormularioSegunPlataforma = (platVal) => {
+    const adaptarFormularioSegunPlataforma = (plat) => {
         if (!inputContrasena || !inputCorreoBase) return;
+        $('grupo-correo-personal').style.display = 'none';
+        $('grupo-enlace-iptv').style.display = 'none';
+        inputCorreoBase.type = 'email';
 
-        if (grupoCorreoPersonal) grupoCorreoPersonal.style.display = 'none';
-        if (grupoEnlaceIptv) grupoEnlaceIptv.style.display = 'none';
-        
-        inputCorreoBase.type = 'email'; 
-
-        if (platVal.includes('Spotify')) {
-            if (grupoCorreoPersonal) grupoCorreoPersonal.style.display = 'flex';
+        if (plat.includes('Spotify')) {
+            $('grupo-correo-personal').style.display = 'flex';
             inputContrasena.required = false;
             inputContrasena.placeholder = 'No requiere contraseña (Invitación)';
             inputCorreoBase.placeholder = 'Correo Admin / Cuenta Madre';
-        } else if (platVal === 'Canva' || platVal === 'CapCut' || platVal === 'Gemini') {
+        } else if (plat === 'Canva' || plat === 'CapCut' || plat === 'Gemini') {
             inputContrasena.required = false;
             inputContrasena.placeholder = 'No requiere contraseña (Invitación por correo)';
             inputCorreoBase.placeholder = 'Correo personal o vinculado del cliente';
-        } else if (platVal === 'IPTV') {
-            if (grupoEnlaceIptv) grupoEnlaceIptv.style.display = 'flex';
+        } else if (plat === 'IPTV') {
+            $('grupo-enlace-iptv').style.display = 'flex';
             inputContrasena.required = true;
             inputContrasena.placeholder = 'Contraseña del IPTV';
-            inputCorreoBase.type = 'text'; 
+            inputCorreoBase.type = 'text';
             inputCorreoBase.placeholder = 'Usuario del IPTV';
         } else {
             inputContrasena.required = true;
@@ -1085,261 +1311,280 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    if (selectPlataforma) {
-        selectPlataforma.addEventListener('change', (e) => {
-            adaptarFormularioSegunPlataforma(e.target.value);
-        });
-    }
-
-    const modalClienteId = 'modal-cliente';
-    const formCliente = document.getElementById('form-cliente');
-    
-    document.getElementById('btn-agregar-cliente')?.addEventListener('click', () => {
-        if (formCliente) formCliente.reset();
-        document.getElementById('cliente-id').value = '';
-        document.getElementById('titulo-modal-cliente').textContent = 'Agregar Cliente';
-        
-        // Disparar el evento de 1 mes (28 días) por defecto
-        const duracionSelect = document.getElementById('cliente-duracion');
-        if (duracionSelect) {
-            duracionSelect.value = '1m';
-            duracionSelect.dispatchEvent(new Event('change'));
-        }
-
-        if (selectPlataforma) adaptarFormularioSegunPlataforma(selectPlataforma.value);
-        toggleModal(modalClienteId, true);
-    });
-
-    document.getElementById('cerrar-modal-cliente')?.addEventListener('click', () => toggleModal(modalClienteId, false));
-
-    window.abrirModalCliente = function(id) {
-        const cliente = clientes.find(c => c.id === id);
-        if (!cliente) return;
-        
-        document.getElementById('cliente-id').value = cliente.id;
-        document.getElementById('cliente-nombre').value = cliente.nombre;
-        document.getElementById('cliente-estado').value = (cliente.estado === 'moroso' || cliente.estado === 'vence-hoy') ? 'moroso' : 'aldia';
-        document.getElementById('cliente-monto').value = cliente.montoPago || '';
-        document.getElementById('cliente-plataforma').value = cliente.servicioPlataforma;
-        document.getElementById('cliente-detalle').value = cliente.servicioDetalle;
-        document.getElementById('cliente-correo').value = cliente.servicioCorreo;
-        
-        // Dejar el visual en 1 mes por defecto pero sin alterar la fecha real
-        const duracionSelect = document.getElementById('cliente-duracion');
-        if (duracionSelect) duracionSelect.value = '1m';
-
-        document.getElementById('cliente-telefono').value = cliente.telefono || '';
-        document.getElementById('cliente-metodo-pago').value = cliente.metodoPago || 'Binance';
-        document.getElementById('cliente-contrasena').value = cliente.contrasena || '';
-        
-        const inputPersonal = document.getElementById('cliente-correo-personal');
-        if (inputPersonal) inputPersonal.value = cliente.correoPersonal || '';
-
-        const inputEnlace = document.getElementById('cliente-enlace');
-        if (inputEnlace) inputEnlace.value = cliente.enlaceIptv || '';
-
-        adaptarFormularioSegunPlataforma(cliente.servicioPlataforma);
-
-        if (cliente.fechaVencimiento) {
-            const fd = new Date(cliente.fechaVencimiento);
-            const yyyy = fd.getFullYear();
-            const mm = String(fd.getMonth() + 1).padStart(2, '0');
-            const dd = String(fd.getDate()).padStart(2, '0');
-            document.getElementById('cliente-fecha-vencimiento').value = `${yyyy}-${mm}-${dd}`;
-        }
-
-        document.getElementById('titulo-modal-cliente').textContent = 'Editar Cliente';
-        toggleModal(modalClienteId, true);
+    // Sugerencias de correo y contraseña tomadas de las cuentas madre
+    const actualizarSugerenciasCorreo = () => {
+        const dl = $('lista-correos-madre');
+        if (!dl || !selectPlataforma) return;
+        const correos = [...new Set(cuentas.filter(c => c.plataforma === selectPlataforma.value).map(c => c.correo))];
+        dl.innerHTML = correos.map(c => `<option value="${esc(c)}"></option>`).join('');
     };
 
-    if (formCliente) {
-        formCliente.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const idForm = document.getElementById('cliente-id').value;
-            const fechaInput = document.getElementById('cliente-fecha-vencimiento').value;
-            const [year, month, day] = fechaInput.split('-');
-            const fechaManual = new Date(year, month - 1, day, 23, 59, 59).getTime();
+    const autocompletarClaveDesdeMadre = () => {
+        const hint = $('hint-clave-madre');
+        if (hint) hint.style.display = 'none';
+        if (!selectPlataforma || !inputContrasena || inputContrasena.value.trim() !== '') return;
+        if (platDef(selectPlataforma.value).sinClave) return;
+        const correo = inputCorreoBase.value.trim().toLowerCase();
+        if (!correo) return;
+        const madre = cuentas.find(c => c.plataforma === selectPlataforma.value && String(c.correo || '').toLowerCase() === correo && c.contrasena);
+        if (madre) {
+            inputContrasena.value = madre.contrasena;
+            if (hint) hint.style.display = 'block';
+        }
+    };
 
-            let telefono = document.getElementById('cliente-telefono').value.replace(/\D/g, ''); 
-            if (telefono.startsWith('0') && telefono.length === 11) {
-                telefono = '58' + telefono.substring(1);
-            } else if (telefono.length === 10 && !telefono.startsWith('58')) {
-                telefono = '58' + telefono;
+    selectPlataforma?.addEventListener('change', (e) => {
+        adaptarFormularioSegunPlataforma(e.target.value);
+        actualizarSugerenciasCorreo();
+        autocompletarClaveDesdeMadre();
+    });
+    inputCorreoBase?.addEventListener('input', autocompletarClaveDesdeMadre);
+    inputCorreoBase?.addEventListener('change', autocompletarClaveDesdeMadre);
+
+    const formCliente = $('form-cliente');
+
+    $('btn-agregar-cliente')?.addEventListener('click', () => {
+        formCliente.reset();
+        $('cliente-id').value = '';
+        $('titulo-modal-cliente').textContent = 'Agregar Cliente';
+        const sel = $('cliente-duracion');
+        sel.value = '1m';
+        sel.dispatchEvent(new Event('change'));
+        adaptarFormularioSegunPlataforma(selectPlataforma.value);
+        actualizarSugerenciasCorreo();
+        $('hint-clave-madre').style.display = 'none';
+        toggleModal('modal-cliente', true);
+    });
+    $('cerrar-modal-cliente')?.addEventListener('click', () => toggleModal('modal-cliente', false));
+
+    const abrirModalCliente = (id) => {
+        const c = clientes.find(x => x.id === id);
+        if (!c) return;
+        $('cliente-id').value = c.id;
+        $('cliente-nombre').value = c.nombre;
+        $('cliente-monto').value = c.montoPago || '';
+        selectPlataforma.value = c.servicioPlataforma;
+        $('cliente-detalle').value = c.servicioDetalle;
+        $('cliente-correo').value = c.servicioCorreo;
+        $('cliente-telefono').value = c.telefono || '';
+        $('cliente-metodo-pago').value = c.metodoPago || 'Binance';
+        $('cliente-contrasena').value = c.contrasena || '';
+        $('cliente-correo-personal').value = c.correoPersonal || '';
+        $('cliente-enlace').value = c.enlaceIptv || '';
+        $('cliente-fecha-vencimiento').value = c.fechaVencimiento ? aInputFecha(c.fechaVencimiento) : '';
+        $('cliente-duracion').value = 'custom'; // no toca la fecha real
+        adaptarFormularioSegunPlataforma(c.servicioPlataforma);
+        actualizarSugerenciasCorreo();
+        $('hint-clave-madre').style.display = 'none';
+        $('titulo-modal-cliente').textContent = 'Editar Cliente';
+        toggleModal('modal-cliente', true);
+    };
+
+    formCliente?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const idForm = $('cliente-id').value;
+        const fechaManual = desdeInputFecha($('cliente-fecha-vencimiento').value);
+
+        let telefono = $('cliente-telefono').value.replace(/\D/g, '');
+        if (telefono.startsWith('0') && telefono.length === 11) telefono = '58' + telefono.substring(1);
+        else if (telefono.length === 10 && !telefono.startsWith('58')) telefono = '58' + telefono;
+
+        const plataforma = selectPlataforma.value;
+        const idNum = idForm ? parseInt(idForm, 10) : Date.now();
+        const previo = idForm ? clientes.find(c => c.id === idNum) : null;
+
+        const datos = {
+            id: idNum,
+            nombre: $('cliente-nombre').value.trim(),
+            estado: 'aldia',
+            montoPago: parseFloat($('cliente-monto').value) || 0,
+            servicioPlataforma: plataforma,
+            servicioDetalle: $('cliente-detalle').value.trim(),
+            servicioCorreo: $('cliente-correo').value.trim(),
+            correoPersonal: plataforma.includes('Spotify') ? $('cliente-correo-personal').value.trim() : '',
+            enlaceIptv: plataforma === 'IPTV' ? $('cliente-enlace').value.trim() : '',
+            fechaVencimiento: fechaManual,
+            telefono,
+            metodoPago: $('cliente-metodo-pago').value,
+            contrasena: $('cliente-contrasena').value.trim(),
+            estadoAviso: previo ? (previo.estadoAviso || 'pendiente') : 'pendiente'
+        };
+
+        if (previo) {
+            clientes[clientes.findIndex(c => c.id === idNum)] = datos;
+            // Solo corrige el último pago si fue registrado hace menos de 24 h (error de dedo).
+            // Antes se reescribían TODOS los pagos pasados al cambiar el precio.
+            const ultimo = historialPagos.filter(p => p.clienteId === idNum).sort((a, b) => b.fecha - a.fecha)[0];
+            if (ultimo && (Date.now() - ultimo.fecha) < 86400000) {
+                ultimo.monto = datos.montoPago;
+                ultimo.plataforma = datos.servicioPlataforma;
             }
+        } else {
+            clientes.push(datos);
+            registrarTransaccionHistorial(datos.montoPago, datos.servicioPlataforma, datos.id);
+        }
 
-            const metodoPago = document.getElementById('cliente-metodo-pago').value;
-            const contrasena = document.getElementById('cliente-contrasena').value.trim();
-            const plataforma = document.getElementById('cliente-plataforma').value;
+        guardarYRenderizarClientes();
+        toggleModal('modal-cliente', false);
+        mostrarNotificacion('¡Cliente guardado! Abriendo WhatsApp...');
+        window.open(urlWhatsApp(datos.telefono, construirMensajeEntrega(datos)), '_blank');
+    });
 
-            const inputPersonal = document.getElementById('cliente-correo-personal');
-            const correoPersonal = (plataforma.includes('Spotify') && inputPersonal) ? inputPersonal.value.trim() : '';
-
-            const inputEnlace = document.getElementById('cliente-enlace');
-            const enlaceIptv = (plataforma === 'IPTV' && inputEnlace) ? inputEnlace.value.trim() : '';
-
-            const datosCliente = {
-                id: idForm ? parseInt(idForm) : Date.now(),
-                nombre: document.getElementById('cliente-nombre').value.trim(),
-                estado: 'aldia', 
-                montoPago: parseFloat(document.getElementById('cliente-monto').value) || 0,
-                servicioPlataforma: plataforma,
-                servicioDetalle: document.getElementById('cliente-detalle').value.trim(),
-                servicioCorreo: document.getElementById('cliente-correo').value.trim(),
-                correoPersonal: correoPersonal,
-                enlaceIptv: enlaceIptv, 
-                fechaVencimiento: fechaManual,
-                telefono: telefono,
-                metodoPago: metodoPago,
-                contrasena: contrasena,
-                estadoAviso: idForm ? (clientes.find(c => c.id === parseInt(idForm))?.estadoAviso || 'pendiente') : 'pendiente'
-            };
-
-            if (idForm) {
-                const index = clientes.findIndex(c => c.id === parseInt(idForm));
-                if (index > -1) { clientes[index] = datosCliente; }
-                
-                historialPagos.forEach(pago => {
-                    if (pago.clienteId === parseInt(idForm)) {
-                        pago.monto = datosCliente.montoPago;
-                        pago.plataforma = datosCliente.servicioPlataforma;
-                    }
-                });
-            } else {
-                clientes.push(datosCliente);
-                registrarTransaccionHistorial(datosCliente.montoPago, datosCliente.servicioPlataforma, datosCliente.id);
-            }
-
-            guardarYRenderizarClientes();
-            toggleModal(modalClienteId, false);
-            mostrarNotificacion('¡Cliente guardado! Abriendo WhatsApp...', 'success');
-
-            const fechaFormateada = new Date(fechaManual).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            
-            let mensajeWa = ''; 
-            const textoContrasena = datosCliente.contrasena !== '' ? `\n• *Contraseña/PIN:* ${datosCliente.contrasena}` : '';
-
-            if (plataforma.includes('Spotify')) {
-                mensajeWa = `Hola ${datosCliente.nombre}!\n\nAquí tienes los detalles de tu cuenta de *${plataforma}*:\n\n• *Tu Correo (Invitación):* ${datosCliente.correoPersonal}\n• *Plan:* ${datosCliente.servicioDetalle}${textoContrasena}\n\n• *Tu cuenta vence el:* ${fechaFormateada}\n\n¡Gracias por tu compra!`;
-            } else if (plataforma === 'Canva' || plataforma === 'CapCut' || plataforma === 'Gemini') {
-                mensajeWa = `Hola ${datosCliente.nombre}!\n\nAquí tienes los detalles de tu acceso a *${plataforma}*:\n\n• *Correo de Invitación:* ${datosCliente.servicioCorreo}\n• *Plan/Equipo:* ${datosCliente.servicioDetalle}${textoContrasena}\n\n• *Tu cuenta vence el:* ${fechaFormateada}\n\n¡Gracias por tu compra! Disfruta tu plataforma.`;
-            } else if (plataforma === 'IPTV') {
-                // FORMATO EXACTO PARA IPTV
-                mensajeWa = `Nombre: ${datosCliente.nombre}\nUsuario: ${datosCliente.servicioCorreo}\nContraseña: ${datosCliente.contrasena}\nEnlace: ${datosCliente.enlaceIptv || 'N/A'}`;
-            } else {
-                mensajeWa = `Hola ${datosCliente.nombre}!\n\nAquí tienes los datos de acceso de tu cuenta de *${datosCliente.servicioPlataforma}*:\n\n• *Correo:* ${datosCliente.servicioCorreo}${textoContrasena}\n• *Perfil Asignado:* ${datosCliente.servicioDetalle}\n\n• *Tu cuenta vence el:* ${fechaFormateada}\n\n¡Gracias por tu compra! Disfruta tu contenido.`;
-            }
-            
-            const urlWa = `https://api.whatsapp.com/send?phone=${datosCliente.telefono}&text=${encodeURIComponent(mensajeWa)}`;
-            window.open(urlWa, '_blank');
-        });
-    }
-
+    // ----- Eliminar cliente -----
     let clienteAEliminarId = null;
-    const modalEliminarClienteId = 'modal-eliminar-cliente';
-    window.eliminarCliente = function(id) { clienteAEliminarId = id; toggleModal(modalEliminarClienteId, true); };
-    document.getElementById('btn-cancelar-eliminar-cliente')?.addEventListener('click', () => { toggleModal(modalEliminarClienteId, false); clienteAEliminarId = null; });
-    document.getElementById('btn-confirmar-eliminar-cliente')?.addEventListener('click', () => {
-        if (clienteAEliminarId !== null) {
-            clientes = clientes.filter(c => c.id !== clienteAEliminarId);
-            historialPagos = historialPagos.filter(pago => pago.clienteId !== clienteAEliminarId);
-            guardarYRenderizarClientes();
-            toggleModal(modalEliminarClienteId, false);
-            clienteAEliminarId = null;
-            mostrarNotificacion('Cliente eliminado', 'info');
-        }
+    $('btn-cancelar-eliminar-cliente')?.addEventListener('click', () => { toggleModal('modal-eliminar-cliente', false); clienteAEliminarId = null; });
+    $('btn-confirmar-eliminar-cliente')?.addEventListener('click', () => {
+        if (clienteAEliminarId === null) return;
+        clientes = clientes.filter(c => c.id !== clienteAEliminarId);
+        historialPagos = historialPagos.filter(p => p.clienteId !== clienteAEliminarId);
+        clienteAEliminarId = null;
+        guardarYRenderizarClientes();
+        toggleModal('modal-eliminar-cliente', false);
+        mostrarNotificacion('Cliente eliminado', 'info');
     });
 
+    // ----- Pago / renovación -----
     let clientePagoId = null;
-    const modalPagoId = 'modal-pago';
-    window.abrirModalPago = function(id) { 
-        clientePagoId = id;
-        const duracionSelect = document.getElementById('pago-duracion');
-        if (duracionSelect) duracionSelect.value = '1m'; // Reset visual al abrir
-        toggleModal(modalPagoId, true); 
-    };
-    document.getElementById('btn-cancelar-pago')?.addEventListener('click', () => { toggleModal(modalPagoId, false); clientePagoId = null; });
-
-    document.getElementById('btn-confirmar-pago')?.addEventListener('click', () => {
-        if (clientePagoId) {
-            const index = clientes.findIndex(c => c.id === clientePagoId);
-            if (index > -1) {
-                let baseDate = new Date();
-                if (clientes[index].fechaVencimiento > Date.now()) {
-                    baseDate = new Date(clientes[index].fechaVencimiento);
-                }
-                
-                // Aplicamos la duración elegida en el modal de pago
-                const duracionPago = document.getElementById('pago-duracion').value;
-                if (duracionPago === '1m') baseDate.setDate(baseDate.getDate() + 28);
-                if (duracionPago === '3m') baseDate.setMonth(baseDate.getMonth() + 3);
-                if (duracionPago === '6m') baseDate.setMonth(baseDate.getMonth() + 6);
-                if (duracionPago === '1y') baseDate.setFullYear(baseDate.getFullYear() + 1);
-                
-                clientes[index].estado = 'aldia';
-                clientes[index].fechaVencimiento = baseDate.setHours(23, 59, 59, 999);
-                
-                registrarTransaccionHistorial(clientes[index].montoPago, clientes[index].servicioPlataforma, clientes[index].id);
-                guardarYRenderizarClientes();
-            }
-            toggleModal(modalPagoId, false);
-            clientePagoId = null;
-            mostrarNotificacion('¡Pago registrado con éxito!');
+    $('btn-cancelar-pago')?.addEventListener('click', () => { toggleModal('modal-pago', false); clientePagoId = null; });
+    $('btn-confirmar-pago')?.addEventListener('click', () => {
+        if (clientePagoId === null) return;
+        const c = clientes.find(x => x.id === clientePagoId);
+        if (c) {
+            const base = c.fechaVencimiento > Date.now() ? new Date(c.fechaVencimiento) : new Date();
+            const nueva = sumarDuracion(base, $('pago-duracion').value);
+            c.estado = 'aldia';
+            c.estadoAviso = 'pendiente';
+            c.fechaVencimiento = nueva.setHours(23, 59, 59, 999);
+            registrarTransaccionHistorial(c.montoPago, c.servicioPlataforma, c.id);
+            guardarYRenderizarClientes();
         }
+        toggleModal('modal-pago', false);
+        clientePagoId = null;
+        mostrarNotificacion('¡Pago registrado con éxito!');
     });
 
-    window.enviarRecordatorio = function(id) {
-        const index = clientes.findIndex(c => c.id === id);
-        if (index > -1) {
-            const c = clientes[index];
-            const estaMoroso = c.estado === 'moroso';
-            const mensaje = `Hola ${c.nombre}!\n\nTe escribimos de *Streaming Mundial* para recordarte que tu suscripción de *${c.servicioPlataforma}* ${estaMoroso ? 'ha vencido' : 'vence el día de hoy'}.\n\nPuedes renovar tu servicio realizando el pago de *$${parseFloat(c.montoPago).toFixed(2)}* vía *${c.metodoPago || 'tu método habitual'}*.\n\n¡Quedamos atentos para renovar tu acceso!`;
-            
-            clientes[index].estadoAviso = 'avisado';
-            guardarYRenderizarClientes();
-            
-            const urlWa = `https://api.whatsapp.com/send?phone=${c.telefono}&text=${encodeURIComponent(mensaje)}`;
-            window.open(urlWa, '_blank');
-            mostrarNotificacion('Recordatorio enviado', 'info');
-        }
+    const enviarRecordatorio = (id) => {
+        const c = clientes.find(x => x.id === id);
+        if (!c) return;
+        const moroso = c.estado === 'moroso';
+        const mensaje = `Hola ${c.nombre}!\n\nTe escribimos de *Streaming Mundial* para recordarte que tu suscripción de *${c.servicioPlataforma}* ${moroso ? 'ha vencido' : 'vence el día de hoy'}.\n\nPuedes renovar tu servicio realizando el pago de *${dinero(c.montoPago)}* vía *${c.metodoPago || 'tu método habitual'}*.\n\n¡Quedamos atentos para renovar tu acceso!`;
+        c.estadoAviso = 'avisado';
+        guardarYRenderizarClientes();
+        window.open(urlWhatsApp(c.telefono, mensaje), '_blank');
+        mostrarNotificacion('Recordatorio enviado', 'info');
     };
 
     // ==========================================
-    // 13. VISTA CONFIGURACIÓN / AJUSTES DE COSTOS
+    // 15. ACCIONES DE LAS TARJETAS (un solo listener)
+    // ==========================================
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-accion]');
+        if (!btn) return;
+        const accion = btn.dataset.accion;
+        const id = btn.dataset.id ? parseInt(btn.dataset.id, 10) : null;
+
+        switch (accion) {
+            case 'editar-cliente': abrirModalCliente(id); break;
+            case 'eliminar-cliente': clienteAEliminarId = id; toggleModal('modal-eliminar-cliente', true); break;
+            case 'pago': clientePagoId = id; $('pago-duracion').value = '1m'; toggleModal('modal-pago', true); break;
+            case 'recordar': enviarRecordatorio(id); break;
+            case 'copiar-datos': {
+                const c = clientes.find(x => x.id === id);
+                if (c) copiarTexto(construirMensajeEntrega(c), 'Datos copiados');
+                break;
+            }
+            case 'subcuentas': abrirModalSubcuentas(id); break;
+            case 'editar-cuenta': abrirModalEditarCuenta(id); break;
+            case 'eliminar-cuenta': cuentaAEliminar = id; toggleModal('modal-eliminar', true); break;
+            case 'copiar': copiarTexto(btn.dataset.valor || '', 'Copiado'); break;
+            case 'ver-pass': {
+                const span = btn.closest('.field-row').querySelector('.pass-value');
+                if (!span) break;
+                const visible = span.dataset.visible === '1';
+                span.textContent = visible ? '••••••••' : span.dataset.pass;
+                span.dataset.visible = visible ? '0' : '1';
+                btn.innerHTML = `<i class="fa-solid ${visible ? 'fa-eye' : 'fa-eye-slash'}"></i>`;
+                break;
+            }
+        }
+    });
+
+    // ==========================================
+    // 16. AJUSTES: COSTOS
     // ==========================================
     const renderizarVistaCostos = () => {
-        const contenedor = document.getElementById('contenedor-costos');
-        if (!contenedor) return;
-        
-        const plataformas = ['Netflix', 'Max', 'Spotify Familiar', 'Spotify Personal', 'Disney+', 'Crunchyroll', 'YouTube Premium', 'Canva', 'CapCut', 'Amazon Prime', 'IPTV', 'ViX', 'Paramount+', 'Gemini'];
-        contenedor.innerHTML = '';
-        
-        contenedor.style.display = 'grid';
-        contenedor.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
-        contenedor.style.gap = '20px';
-        
-        plataformas.forEach(plat => {
-            const costoActual = costosProveedores[plat] || 0;
-            contenedor.innerHTML += `
-                <div class="form-group" style="background: rgba(255, 255, 255, 0.05); padding: 18px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);">
-                    <label style="font-size: 0.9rem; color: rgba(255,255,255,0.9); margin-bottom: 10px; display: block; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">${plat}</label>
-                    <div class="input-icon-wrapper">
-                        <i class="fa-solid fa-dollar-sign"></i>
-                        <input type="number" step="0.01" min="0" id="costo-${plat.replace(/\s+/g, '')}" class="input-costo" data-plat="${plat}" value="${costoActual}">
-                    </div>
+        const cont = $('contenedor-costos');
+        if (!cont) return;
+        cont.innerHTML = PLATAFORMAS.map(p => `
+            <div class="costo-item">
+                <label><i class="${p.icono}" style="color:${p.color}"></i> ${esc(p.nombre)}</label>
+                <div class="input-icon-wrapper">
+                    <i class="fa-solid fa-dollar-sign"></i>
+                    <input type="number" step="0.01" min="0" class="input-costo" data-plat="${esc(p.nombre)}" value="${parseFloat(costosProveedores[p.nombre]) || 0}">
                 </div>
-            `;
-        });
+            </div>`).join('');
     };
 
-    document.getElementById('btn-guardar-costos')?.addEventListener('click', () => {
+    $('btn-guardar-costos')?.addEventListener('click', () => {
         document.querySelectorAll('.input-costo').forEach(input => {
-            const plat = input.getAttribute('data-plat');
-            costosProveedores[plat] = parseFloat(input.value) || 0;
+            costosProveedores[input.dataset.plat] = parseFloat(input.value) || 0;
         });
-        guardarNube();           
-        actualizarDashboard();   
-        mostrarNotificacion('Costos guardados y calculados', 'success');
+        guardarNube();
+        actualizarDashboard();
+        mostrarNotificacion('Costos guardados y calculados');
     });
+
+    // ==========================================
+    // 17. AJUSTES: RESPALDO DE DATOS
+    // ==========================================
+    $('btn-exportar')?.addEventListener('click', () => {
+        const datos = { version: 1, fecha: new Date().toISOString(), cuentas, clientes, historialPagos, costosProveedores };
+        const blob = new Blob([JSON.stringify(datos, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `streaming-mundial-respaldo-${aInputFecha(Date.now())}.json`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        mostrarNotificacion('Respaldo descargado');
+    });
+
+    $('archivo-importar')?.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = '';
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                const d = JSON.parse(reader.result);
+                if (!Array.isArray(d.cuentas) || !Array.isArray(d.clientes)) throw new Error('formato');
+                if (!confirm('Esto reemplazará TODOS tus datos actuales por los del respaldo. ¿Continuar?')) return;
+                cuentas = d.cuentas;
+                clientes = d.clientes;
+                historialPagos = d.historialPagos || [];
+                costosProveedores = d.costosProveedores || {};
+                guardarNube();
+                refrescarTodo();
+                mostrarNotificacion('Respaldo restaurado');
+            } catch (err) {
+                mostrarNotificacion('Ese archivo no es un respaldo válido', 'info');
+            }
+        };
+        reader.readAsText(file);
+    });
+
+    // ==========================================
+    // 18. INICIO
+    // ==========================================
+    const fechaHoy = $('fecha-hoy');
+    if (fechaHoy) fechaHoy.textContent = new Date().toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' });
+
+    iniciarAjustesApariencia();
+    sincronizarControlesTema();
+
+    try {
+        const ultima = localStorage.getItem('sm_vista');
+        if (ultima && ultima !== 'inicio') irAVista(ultima);
+    } catch (e) { /* nada */ }
 
     escucharNubeEnTiempoReal();
 });

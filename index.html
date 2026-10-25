@@ -2,91 +2,108 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#070B14">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Streaming Mundial</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📺%3C/text%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
-    <style>
-        /* Corrección de responsive para modales en teléfonos */
-        .form-group-row {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap; /* Permite que bajen si no hay espacio */
-        }
-        .form-group.flex-1 {
-            flex: 1 1 140px; /* Tamaño mínimo antes de bajar de línea */
-        }
-    </style>
 </head>
 <body>
+    <!-- FONDO (wallpaper) -->
+    <div id="wallpaper"></div>
+    <div id="wallpaper-overlay"></div>
+
+    <!-- CARGANDO -->
+    <div id="loader" class="loader">
+        <div class="loader__ring"></div>
+        <p>Conectando con tu inventario…</p>
+    </div>
+
     <header class="mobile-header">
         <div class="logo">
+            <span class="logo__mark"><i class="fa-solid fa-play"></i></span>
             <h2>Streaming<span> Mundial</span></h2>
+        </div>
+        <div class="header-right">
+            <span class="chip-fecha" id="fecha-hoy"></span>
+            <button class="icon-btn" id="btn-tema-rapido" type="button" title="Personalizar apariencia">
+                <i class="fa-solid fa-palette"></i>
+            </button>
         </div>
     </header>
 
     <main class="main-content">
-        
-        <!-- VISTA INICIO -->
+
+        <!-- ================= VISTA INICIO ================= -->
         <div id="vista-inicio" class="vista-seccion">
             <div class="top-section">
                 <h1>Resumen General</h1>
+                <p class="subtitle">Estado de tu negocio en tiempo real</p>
             </div>
 
             <section class="kpi-section">
                 <div class="kpi-card kpi-card--default">
+                    <i class="kpi-card__icon fa-solid fa-box-archive"></i>
                     <span class="kpi-card__title">Cuentas Madre</span>
                     <h2 class="kpi-card__value" id="kpi-madres">0</h2>
                 </div>
                 <div class="kpi-card kpi-card--success">
+                    <i class="kpi-card__icon fa-solid fa-circle-check"></i>
                     <span class="kpi-card__title">Al Día</span>
                     <h2 class="kpi-card__value" id="kpi-aldia">0</h2>
                 </div>
                 <div class="kpi-card kpi-card--danger">
+                    <i class="kpi-card__icon fa-solid fa-circle-exclamation"></i>
                     <span class="kpi-card__title">Atrasado</span>
                     <h2 class="kpi-card__value" id="kpi-mora">0</h2>
                 </div>
                 <div class="kpi-card kpi-card--info">
+                    <i class="kpi-card__icon fa-solid fa-sack-dollar"></i>
                     <span class="kpi-card__title">Ingreso Estimado</span>
                     <h2 class="kpi-card__value" id="kpi-ingresos">$0.00</h2>
                 </div>
                 <div class="kpi-card kpi-card--warning">
-                <span class="kpi-card__title">Pago a Proveedores</span>
+                    <i class="kpi-card__icon fa-solid fa-truck-ramp-box"></i>
+                    <span class="kpi-card__title">Pago a Proveedores</span>
                     <h2 class="kpi-card__value" id="rep-proveedores">$0.00</h2>
                     <p>Costo de Cuentas Madre</p>
                 </div>
                 <div class="kpi-card kpi-card--purple">
+                    <i class="kpi-card__icon fa-solid fa-gem"></i>
                     <span class="kpi-card__title">Ganancia Neta</span>
                     <h2 class="kpi-card__value" id="rep-ganancia">$0.00</h2>
                     <p>Tu beneficio real</p>
                 </div>
             </section>
 
-            <section class="vence-hoy-section" id="section-vence-hoy">
-                <h3 class="section-title"><i class="fa-solid fa-clock icono-reloj" style="color: #F59E0B; margin-right: 8px;"></i> Clientes que Vencen Hoy</h3>
+            <section class="bloque vista-oculta" id="section-vence-hoy">
+                <h3 class="section-title"><i class="fa-solid fa-clock" style="color:#F59E0B"></i> Clientes que Vencen Hoy</h3>
                 <div class="grid-clientes" id="contenedor-vence-hoy"></div>
             </section>
 
-            <section class="vence-hoy-section vista-oculta" id="section-cuentas-vencen" style="margin-top: 20px;">
-                <h3 class="section-title"><i class="fa-solid fa-triangle-exclamation" style="color: #EF4444; margin-right: 8px;"></i> Cuentas Madre por Vencer</h3>
+            <section class="bloque vista-oculta" id="section-cuentas-vencen">
+                <h3 class="section-title"><i class="fa-solid fa-triangle-exclamation" style="color:#EF4444"></i> Cuentas Madre por Vencer</h3>
                 <div class="grid-cuentas" id="contenedor-cuentas-vencen"></div>
             </section>
 
-            <section class="plataformas-section">
+            <section class="bloque">
                 <h3 class="section-title">Servicios Activos</h3>
                 <div class="plataformas-grid" id="contenedor-plataformas"></div>
             </section>
         </div>
 
-        <!-- VISTA CUENTAS -->
+        <!-- ================= VISTA CUENTAS ================= -->
         <div id="vista-cuentas" class="vista-seccion vista-oculta">
             <div class="top-section top-flex">
                 <div class="header-titulos">
                     <h1>Cuentas Madre</h1>
-                    <p class="subtitle">Gestión de inventario y subcuentas</p>
+                    <p class="subtitle" id="resumen-cuentas">Gestión de inventario y subcuentas</p>
                 </div>
                 <div class="acciones-top">
                     <div class="search-box">
@@ -99,40 +116,25 @@
                 </div>
             </div>
 
-            <div class="filtros-plataformas">
-                <button class="btn-filtro active" data-filtro="Todas" type="button">Todas</button>
-                <button class="btn-filtro" data-filtro="Netflix" type="button"><i class="fa-solid fa-play plat-netflix"></i> Netflix</button>
-                <button class="btn-filtro" data-filtro="Max" type="button"><i class="fa-solid fa-tv plat-max"></i> Max</button>
-                <button class="btn-filtro" data-filtro="Spotify Familiar" type="button"><i class="fa-brands fa-spotify plat-spotify"></i> Spotify Familiar</button>
-                <button class="btn-filtro" data-filtro="Spotify Personal" type="button"><i class="fa-brands fa-spotify plat-spotify"></i> Spotify Personal</button>
-                <button class="btn-filtro" data-filtro="Disney+" type="button"><i class="fa-solid fa-star plat-disney"></i> Disney+</button>
-                <button class="btn-filtro" data-filtro="Amazon Prime" type="button"><i class="fa-brands fa-amazon plat-amazon"></i> Amazon Prime</button>
-                <button class="btn-filtro" data-filtro="Crunchyroll" type="button"><i class="fa-solid fa-fire plat-crunchyroll"></i> Crunchyroll</button>
-                <button class="btn-filtro" data-filtro="YouTube Premium" type="button"><i class="fa-brands fa-youtube plat-youtube"></i> YouTube Prem.</button>
-                <button class="btn-filtro" data-filtro="Canva" type="button"><i class="fa-solid fa-palette plat-canva"></i> Canva</button>
-                <button class="btn-filtro" data-filtro="CapCut" type="button"><i class="fa-solid fa-video plat-capcut"></i> CapCut</button>
-                <button class="btn-filtro" data-filtro="IPTV" type="button"><i class="fa-solid fa-satellite-dish plat-iptv"></i> IPTV</button>
-                <button class="btn-filtro" data-filtro="ViX" type="button"><i class="fa-solid fa-video plat-vix"></i> ViX</button>
-                <button class="btn-filtro" data-filtro="Paramount+" type="button"><i class="fa-solid fa-mountain plat-paramount"></i> Paramount+</button>
-                <button class="btn-filtro" data-filtro="Gemini" type="button"><i class="fa-solid fa-sparkles plat-gemini"></i> Gemini</button>
-            </div>
+            <!-- Los filtros se generan desde script.js -->
+            <div class="filtros-plataformas" id="filtros-cuentas"></div>
 
             <div class="grupo-cuentas">
                 <div class="grid-cuentas"></div>
             </div>
         </div>
 
-        <!-- VISTA CLIENTES -->
+        <!-- ================= VISTA CLIENTES ================= -->
         <div id="vista-clientes" class="vista-seccion vista-oculta">
             <div class="top-section top-flex">
                 <div class="header-titulos">
                     <h1>Gestión de Clientes</h1>
-                    <p class="subtitle">Monitoreo de perfiles asignados y estados de pago</p>
+                    <p class="subtitle" id="resumen-clientes">Monitoreo de perfiles asignados y estados de pago</p>
                 </div>
                 <div class="acciones-top">
                     <div class="search-box">
                         <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                        <input type="text" id="buscador-clientes" placeholder="Buscar por cliente o correo...">
+                        <input type="text" id="buscador-clientes" placeholder="Buscar cliente, correo, plataforma...">
                     </div>
                     <button class="btn-primario" id="btn-agregar-cliente" type="button">
                         <i class="fa-solid fa-user-plus"></i> Agregar Cliente
@@ -140,10 +142,10 @@
                 </div>
             </div>
 
-            <div class="filtros-plataformas">
+            <div class="filtros-plataformas" id="filtros-clientes">
                 <button class="btn-filtro active" data-filtro="todos" type="button">Todos</button>
-                <button class="btn-filtro" data-filtro="aldia" type="button"><i class="fa-solid fa-circle-check plat-spotify"></i> Al Día</button>
-                <button class="btn-filtro" data-filtro="vencidos" type="button"><i class="fa-solid fa-circle-exclamation plat-netflix"></i> Vencidos</button>
+                <button class="btn-filtro" data-filtro="aldia" type="button"><i class="fa-solid fa-circle-check" style="color:#34D399"></i> Al Día</button>
+                <button class="btn-filtro" data-filtro="vencidos" type="button"><i class="fa-solid fa-circle-exclamation" style="color:#F87171"></i> Vencidos</button>
             </div>
 
             <div class="grupo-clientes">
@@ -151,79 +153,207 @@
             </div>
         </div>
 
-        <!-- VISTA REPORTES / FINANZAS -->
+        <!-- ================= VISTA FINANZAS ================= -->
         <div id="vista-reportes" class="vista-seccion vista-oculta">
             <div class="top-section">
                 <h1>Reportes Financieros</h1>
                 <p class="subtitle">Análisis de ingresos y estado de cobranza</p>
             </div>
 
-            <section class="kpi-section" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;">
+            <section class="kpi-section">
                 <div class="kpi-card kpi-card--info">
+                    <i class="kpi-card__icon fa-solid fa-bullseye"></i>
                     <span class="kpi-card__title">Total Esperado</span>
                     <h2 class="kpi-card__value" id="rep-esperado">$0.00</h2>
                     <p>Si todos pagan</p>
                 </div>
                 <div class="kpi-card kpi-card--success">
+                    <i class="kpi-card__icon fa-solid fa-hand-holding-dollar"></i>
                     <span class="kpi-card__title">Recaudado Actual</span>
                     <h2 class="kpi-card__value" id="rep-cobrado">$0.00</h2>
                     <p>Clientes al día</p>
                 </div>
                 <div class="kpi-card kpi-card--danger">
+                    <i class="kpi-card__icon fa-solid fa-hourglass-half"></i>
                     <span class="kpi-card__title">Pagos Pendientes</span>
                     <h2 class="kpi-card__value" id="rep-pendiente">$0.00</h2>
                     <p>Dinero en la calle</p>
                 </div>
-                
                 <div class="kpi-card kpi-card--warning">
+                    <i class="kpi-card__icon fa-solid fa-truck-ramp-box"></i>
                     <span class="kpi-card__title">Pago a Proveedores</span>
                     <h2 class="kpi-card__value" id="rep-proveedores-2">$0.00</h2>
                     <p>Costo de Cuentas Madre</p>
                 </div>
                 <div class="kpi-card kpi-card--purple">
+                    <i class="kpi-card__icon fa-solid fa-gem"></i>
                     <span class="kpi-card__title">Ganancia Neta</span>
                     <h2 class="kpi-card__value" id="rep-ganancia-2">$0.00</h2>
                     <p>Tu beneficio real</p>
                 </div>
             </section>
 
-            <section class="diario-section" style="margin-bottom: 30px;">
+            <section class="bloque">
                 <h3 class="section-title">Ingresos Diarios</h3>
-                <div class="plat-card">
-                    <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed #E5E7EB;">
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <div style="background: rgba(59, 130, 246, 0.1); padding: 12px; border-radius: 12px; color: #3B82F6; font-size: 1.2rem;">
-                                <i class="fa-solid fa-calendar-day"></i>
-                            </div>
+                <div class="plat-card diario-card">
+                    <div class="diario-card__top">
+                        <div class="hist-card__left">
+                            <div class="hist-icon"><i class="fa-solid fa-calendar-day"></i></div>
                             <div>
-                                <h3 style="margin: 0; font-size: 1.05rem; color: #1F2937;">Recaudación por Fecha</h3>
-                                <p style="margin: 4px 0 0 0; font-size: 0.8rem; color: #6B7280;">Selecciona un día para ver el total</p>
+                                <h3 class="plat-name">Recaudación por Fecha</h3>
+                                <p class="muted-sm">Selecciona un día para ver el total</p>
                             </div>
                         </div>
-                        <div class="input-icon-wrapper" style="border: 1px solid #D1D5DB; border-radius: 10px; background: #F9FAFB; max-width: 200px; width: 100%;">
-                            <i class="fa-solid fa-calendar" style="color: #6B7280;"></i>
-                            <input type="date" id="filtro-fecha-diario" style="background: transparent; color: #1F2937; padding: 10px 14px 10px 42px; border: none; outline: none; width: 100%; cursor: pointer;">
+                        <div class="input-icon-wrapper diario-card__fecha">
+                            <i class="fa-solid fa-calendar"></i>
+                            <input type="date" id="filtro-fecha-diario">
                         </div>
                     </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: 0.95rem; font-weight: 700; color: #4B5563;">Total del día:</span>
-                        <h2 id="total-diario" style="margin: 0; color: #3B82F6; font-size: 1.6rem;">$0.00</h2>
+                    <div class="diario-card__total">
+                        <span>Total del día:</span>
+                        <h2 id="total-diario">$0.00</h2>
                     </div>
                 </div>
             </section>
 
-            <section class="historial-section" style="margin-bottom: 30px;">
+            <section class="bloque">
+                <h3 class="section-title">Últimos 6 Meses</h3>
+                <div class="plat-card">
+                    <div class="bar-chart" id="grafico-meses"></div>
+                </div>
+            </section>
+
+            <section class="bloque">
                 <h3 class="section-title">Historial de Ingresos Mensuales</h3>
                 <div class="grid-historial-meses" id="contenedor-historial-meses"></div>
             </section>
 
-            <section class="plataformas-section">
+            <section class="bloque">
                 <h3 class="section-title">Desglose por Plataforma (Mes Actual)</h3>
                 <div class="plataformas-grid" id="contenedor-reporte-plataformas"></div>
             </section>
         </div>
 
+        <!-- ================= VISTA AJUSTES ================= -->
+        <div id="vista-configuracion" class="vista-seccion vista-oculta">
+            <div class="top-section">
+                <h1>Ajustes</h1>
+                <p class="subtitle">Personaliza la plataforma, tus costos y tus respaldos</p>
+            </div>
+
+            <div class="tabs" id="tabs-ajustes">
+                <button class="tab-btn active" data-tab="apariencia" type="button"><i class="fa-solid fa-palette"></i> Apariencia</button>
+                <button class="tab-btn" data-tab="costos" type="button"><i class="fa-solid fa-dollar-sign"></i> Costos</button>
+                <button class="tab-btn" data-tab="datos" type="button"><i class="fa-solid fa-database"></i> Datos</button>
+            </div>
+
+            <!-- TAB APARIENCIA -->
+            <section id="tab-apariencia" class="tab-panel">
+                <div class="panel">
+                    <div class="panel__head">
+                        <h3><i class="fa-solid fa-droplet"></i> Color de la plataforma</h3>
+                        <label class="switch">
+                            <input type="checkbox" id="tema-auto">
+                            <span class="switch__track"></span>
+                            <span class="switch__label">Color automático según el fondo</span>
+                        </label>
+                    </div>
+                    <div class="swatches" id="swatches"></div>
+                    <div class="color-custom">
+                        <label for="tema-color">Color personalizado</label>
+                        <input type="color" id="tema-color" value="#38BDF8">
+                        <span class="color-custom__hex" id="tema-color-hex">#38BDF8</span>
+                    </div>
+                    <p class="hint">Elige un solo color y la plataforma genera sola el resto: degradados, brillos, fondo y el color del texto de los botones para que siempre se lean bien.</p>
+                </div>
+
+                <div class="panel">
+                    <div class="panel__head">
+                        <h3><i class="fa-solid fa-image"></i> Fondo de pantalla</h3>
+                    </div>
+                    <div class="fondos-grid" id="fondos-grid"></div>
+                    <div class="fondo-acciones">
+                        <label class="glass-btn" for="fondo-archivo"><i class="fa-solid fa-upload"></i> Subir mi imagen</label>
+                        <input type="file" id="fondo-archivo" accept="image/*" hidden>
+                        <div class="fondo-url">
+                            <input type="url" id="fondo-url" placeholder="o pega el enlace de una imagen (https://...)">
+                            <button class="glass-btn" id="btn-fondo-url" type="button"><i class="fa-solid fa-link"></i> Usar</button>
+                        </div>
+                    </div>
+                    <p class="hint">Las imágenes subidas se comprimen y se guardan solo en este dispositivo.</p>
+                </div>
+
+                <div class="panel">
+                    <div class="panel__head">
+                        <h3><i class="fa-solid fa-wand-magic-sparkles"></i> Efecto cristal</h3>
+                    </div>
+                    <div class="sliders">
+                        <label class="slider">
+                            <span>Desenfoque del cristal <b id="val-blur">22px</b></span>
+                            <input type="range" id="tema-blur" min="0" max="40" step="1">
+                        </label>
+                        <label class="slider">
+                            <span>Transparencia de tarjetas <b id="val-opacidad">8%</b></span>
+                            <input type="range" id="tema-opacidad" min="3" max="30" step="1">
+                        </label>
+                        <label class="slider">
+                            <span>Oscurecer fondo <b id="val-oscurecer">35%</b></span>
+                            <input type="range" id="tema-oscurecer" min="0" max="80" step="1">
+                        </label>
+                        <label class="slider">
+                            <span>Desenfoque del fondo <b id="val-blurfondo">0px</b></span>
+                            <input type="range" id="tema-blurfondo" min="0" max="24" step="1">
+                        </label>
+                    </div>
+                </div>
+
+                <button class="btn-secundario" id="btn-reset-tema" type="button"><i class="fa-solid fa-rotate-left"></i> Restablecer apariencia</button>
+            </section>
+
+            <!-- TAB COSTOS -->
+            <section id="tab-costos" class="tab-panel vista-oculta">
+                <div class="panel">
+                    <div class="panel__head">
+                        <h3><i class="fa-solid fa-dollar-sign"></i> Costo por Cuenta Madre</h3>
+                    </div>
+                    <p class="hint" style="margin-top:0">Cuánto pagas al proveedor por cada Cuenta Madre de cada plataforma.</p>
+                    <div id="contenedor-costos" class="costos-grid"></div>
+                    <button id="btn-guardar-costos" class="btn-primario btn-full-mt" type="button">
+                        <i class="fa-solid fa-floppy-disk"></i> Guardar Costos
+                    </button>
+                </div>
+            </section>
+
+            <!-- TAB DATOS -->
+            <section id="tab-datos" class="tab-panel vista-oculta">
+                <div class="panel">
+                    <div class="panel__head">
+                        <h3><i class="fa-solid fa-shield-halved"></i> Respaldo de datos</h3>
+                    </div>
+                    <p class="hint" style="margin-top:0">Descarga una copia de todas tus cuentas, clientes, pagos y costos. Guárdala de vez en cuando por si algo sale mal.</p>
+                    <div class="datos-acciones">
+                        <button class="btn-primario" id="btn-exportar" type="button"><i class="fa-solid fa-download"></i> Descargar respaldo</button>
+                        <label class="btn-secundario" for="archivo-importar"><i class="fa-solid fa-upload"></i> Restaurar respaldo</label>
+                        <input type="file" id="archivo-importar" accept="application/json,.json" hidden>
+                    </div>
+                    <p class="hint" id="info-backup-auto"></p>
+                </div>
+            </section>
+        </div>
+
         <!-- ================= MODALES ================= -->
+
+        <!-- MODAL AVISO VENCIMIENTOS DE HOY -->
+        <div class="modal-overlay modal-oculto z-alto" id="modal-aviso-vencidos-hoy">
+            <div class="modal-box modal-box--warning">
+                <div class="modal-box__warning-icon"><i class="fa-solid fa-clock"></i></div>
+                <h3 class="modal-box__title">Aviso de Vencimiento</h3>
+                <p class="modal-box__text" id="texto-aviso-hoy"></p>
+                <div class="modal-box__buttons">
+                    <button id="btn-cerrar-aviso-hoy" class="btn-primario" type="button" style="flex:1">Entendido</button>
+                </div>
+            </div>
+        </div>
 
         <!-- MODAL GESTIONAR SUBCUENTAS -->
         <div class="modal-overlay modal-oculto z-alto" id="modal-subcuentas">
@@ -255,26 +385,11 @@
                     <button class="btn-cerrar-modal" id="cerrar-modal-agregar" type="button"><i class="fa-solid fa-xmark"></i></button>
                 </div>
                 <div class="modal-box__body">
-                    <form id="form-agregar-cuenta" class="form-grid">
+                    <form id="form-agregar-cuenta" class="form-grid" autocomplete="off">
                         <div class="form-group-row">
                             <div class="form-group flex-1">
                                 <label>Plataforma</label>
-                                <select id="nuevo-plataforma" class="select-basic">
-                                    <option value="Netflix">Netflix</option>
-                                    <option value="Spotify Familiar">Spotify Familiar</option>
-                                    <option value="Spotify Personal">Spotify Personal</option>
-                                    <option value="Max">Max</option>
-                                    <option value="Disney+">Disney+</option>
-                                    <option value="Amazon Prime">Amazon Prime</option>
-                                    <option value="Crunchyroll">Crunchyroll</option>
-                                    <option value="YouTube Premium">YouTube Premium</option>
-                                    <option value="Canva">Canva</option>
-                                    <option value="CapCut">CapCut</option>
-                                    <option value="IPTV">IPTV</option>
-                                    <option value="ViX">ViX</option>
-                                    <option value="Paramount+">Paramount+</option>
-                                    <option value="Gemini">Gemini</option>
-                                </select>
+                                <select id="nuevo-plataforma" class="select-basic"></select>
                             </div>
                             <div class="form-group flex-1">
                                 <label>Duración</label>
@@ -283,36 +398,95 @@
                                     <option value="3m">3 Meses</option>
                                     <option value="6m">6 Meses</option>
                                     <option value="1y">1 Año</option>
+                                    <option value="custom">Fecha personalizada</option>
                                 </select>
                             </div>
                         </div>
 
                         <div class="form-group">
                             <label>Correo Principal</label>
-                            <input type="email" id="nuevo-correo" class="input-basic" placeholder="correo@gmail.com" required>
+                            <div class="input-icon-wrapper">
+                                <i class="fa-solid fa-envelope"></i>
+                                <input type="email" id="nuevo-correo" placeholder="correo@gmail.com" required>
+                            </div>
                         </div>
-                        
+
+                        <div class="form-group">
+                            <label>Contraseña de la Cuenta</label>
+                            <div class="input-icon-wrapper has-eye">
+                                <i class="fa-solid fa-lock"></i>
+                                <input type="password" id="nuevo-contrasena" placeholder="Contraseña de acceso (opcional)" autocomplete="new-password">
+                                <button class="btn-ojo" type="button" data-toggle-pass title="Mostrar / ocultar"><i class="fa-solid fa-eye"></i></button>
+                            </div>
+                        </div>
+
                         <div class="form-group-row">
                             <div class="form-group flex-1">
                                 <label>Cantidad de Perfiles</label>
                                 <input type="number" id="nuevo-perfiles" class="input-basic" value="5" min="1" max="10" required>
                             </div>
                             <div class="form-group flex-1">
-                                <label>Estado Inicial</label>
-                                <select id="nuevo-estado" class="select-basic">
-                                    <option value="aldia">Al Día</option>
-                                    <option value="por-vencer">Por Vencer</option>
-                                    <option value="vencida">Vencida</option>
-                                </select>
+                                <label>Vencimiento</label>
+                                <input type="date" id="nuevo-vencimiento-cuenta" class="input-basic" required>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn-primario btn-full-mt">Guardar Cuenta Madre</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL EDITAR CUENTA MADRE -->
+        <div class="modal-overlay modal-oculto z-alto" id="modal-editar-cuenta">
+            <div class="modal-box">
+                <div class="modal-box__header">
+                    <div>
+                        <h3 class="modal-title">Editar Cuenta Madre</h3>
+                        <p class="correo-ref" id="edit-cuenta-ref">Actualiza los datos de acceso</p>
+                    </div>
+                    <button class="btn-cerrar-modal" id="cerrar-modal-editar-cuenta" type="button"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="modal-box__body">
+                    <form id="form-editar-cuenta" class="form-grid" autocomplete="off">
+                        <input type="hidden" id="edit-cuenta-id">
+
+                        <div class="form-group">
+                            <label>Correo Principal</label>
+                            <div class="input-icon-wrapper">
+                                <i class="fa-solid fa-envelope"></i>
+                                <input type="email" id="edit-cuenta-correo" placeholder="nuevo.correo@gmail.com" required>
                             </div>
                         </div>
 
                         <div class="form-group">
-                            <label>Vencimiento de la Cuenta</label>
-                            <input type="date" id="nuevo-vencimiento-cuenta" class="input-basic" required>
+                            <label>Contraseña de la Cuenta</label>
+                            <div class="input-icon-wrapper has-eye">
+                                <i class="fa-solid fa-lock"></i>
+                                <input type="password" id="edit-cuenta-contrasena" placeholder="Contraseña de acceso" autocomplete="new-password">
+                                <button class="btn-ojo" type="button" data-toggle-pass title="Mostrar / ocultar"><i class="fa-solid fa-eye"></i></button>
+                            </div>
                         </div>
 
-                        <button type="submit" class="btn-primario btn-full-mt">Guardar Cuenta Madre</button>
+                        <div class="form-group">
+                            <label>Fecha de Vencimiento</label>
+                            <div class="input-icon-wrapper">
+                                <i class="fa-regular fa-calendar-days"></i>
+                                <input type="date" id="edit-cuenta-vencimiento" required>
+                            </div>
+                        </div>
+
+                        <label class="check-line" id="grupo-propagar">
+                            <input type="checkbox" id="edit-cuenta-propagar">
+                            <span>Si cambio la contraseña, actualizarla también en los clientes vinculados a esta cuenta</span>
+                        </label>
+                        
+                        <label class="check-line" style="margin-top: 10px;">
+                            <input type="checkbox" id="edit-cuenta-notificar">
+                            <span>Notificar a todos los clientes vinculados (enviar mensaje de actualización)</span>
+                        </label>
+
+                        <button type="submit" class="btn-primario btn-full-mt">Guardar Cambios</button>
                     </form>
                 </div>
             </div>
@@ -329,7 +503,7 @@
                     <button id="btn-confirmar-eliminar" class="btn-modal-danger" type="button">Sí, eliminar</button>
                 </div>
             </div>
-        </div> 
+        </div>
 
         <!-- MODAL ELIMINAR CLIENTE -->
         <div class="modal-overlay modal-oculto z-alto" id="modal-eliminar-cliente">
@@ -355,9 +529,9 @@
                     <button class="btn-cerrar-modal" id="cerrar-modal-cliente" type="button"><i class="fa-solid fa-xmark"></i></button>
                 </div>
                 <div class="modal-box__body">
-                    <form id="form-cliente" class="form-grid">
+                    <form id="form-cliente" class="form-grid" autocomplete="off">
                         <input type="hidden" id="cliente-id">
-                        
+
                         <div class="form-group">
                             <label>Nombre del Cliente</label>
                             <div class="input-icon-wrapper">
@@ -365,7 +539,7 @@
                                 <input type="text" id="cliente-nombre" placeholder="Ej. Carlos Gómez" required>
                             </div>
                         </div>
-                        
+
                         <div class="form-group-row">
                             <div class="form-group flex-1">
                                 <label>WhatsApp (Sin el +)</label>
@@ -388,18 +562,7 @@
                             </div>
                         </div>
 
-                        <!-- FILA DE ESTADO Y DURACIÓN -->
                         <div class="form-group-row">
-                            <div class="form-group flex-1">
-                                <label>Estado</label>
-                                <div class="input-icon-wrapper">
-                                    <i class="fa-solid fa-signal"></i>
-                                    <select id="cliente-estado">
-                                        <option value="aldia">Al Día</option>
-                                        <option value="moroso">Vencido</option>
-                                    </select>
-                                </div>
-                            </div>
                             <div class="form-group flex-1">
                                 <label>Duración</label>
                                 <div class="input-icon-wrapper">
@@ -409,12 +572,10 @@
                                         <option value="3m">3 Meses</option>
                                         <option value="6m">6 Meses</option>
                                         <option value="1y">1 Año</option>
+                                        <option value="custom">Fecha personalizada</option>
                                     </select>
                                 </div>
                             </div>
-                        </div>
-
-                        <div class="form-group-row">
                             <div class="form-group flex-1">
                                 <label>Vencimiento</label>
                                 <div class="input-icon-wrapper">
@@ -422,12 +583,13 @@
                                     <input type="date" id="cliente-fecha-vencimiento" required>
                                 </div>
                             </div>
-                            <div class="form-group flex-1">
-                                <label>Monto Pagado ($)</label>
-                                <div class="input-icon-wrapper">
-                                    <i class="fa-solid fa-money-bill-wave"></i>
-                                    <input type="number" id="cliente-monto" placeholder="Ej. 10" step="0.01" min="0" required>
-                                </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Monto Pagado ($)</label>
+                            <div class="input-icon-wrapper">
+                                <i class="fa-solid fa-money-bill-wave"></i>
+                                <input type="number" id="cliente-monto" placeholder="Ej. 10" step="0.01" min="0" required>
                             </div>
                         </div>
 
@@ -438,22 +600,7 @@
                             </div>
                             <div class="input-icon-wrapper mb-2">
                                 <i class="fa-solid fa-tv"></i>
-                                <select id="cliente-plataforma">
-                                    <option value="Netflix">Netflix</option>
-                                    <option value="Spotify Familiar">Spotify Familiar</option>
-                                    <option value="Spotify Personal">Spotify Personal</option>
-                                    <option value="Max">Max</option>
-                                    <option value="Disney+">Disney+</option>
-                                    <option value="Amazon Prime">Amazon Prime</option>
-                                    <option value="Crunchyroll">Crunchyroll</option>
-                                    <option value="YouTube Premium">YouTube Premium</option>
-                                    <option value="Canva">Canva</option>
-                                    <option value="CapCut">CapCut</option>
-                                    <option value="IPTV">IPTV</option>
-                                    <option value="ViX">ViX</option>
-                                    <option value="Paramount+">Paramount+</option>
-                                    <option value="Gemini">Gemini</option>
-                                </select>
+                                <select id="cliente-plataforma"></select>
                             </div>
                             <div class="input-icon-wrapper mb-2">
                                 <i class="fa-solid fa-users-rectangle"></i>
@@ -461,11 +608,12 @@
                             </div>
                             <div class="input-icon-wrapper mb-2">
                                 <i class="fa-solid fa-envelope"></i>
-                                <input type="email" id="cliente-correo" placeholder="correo.vinculado@gmail.com" required>
+                                <input type="email" id="cliente-correo" list="lista-correos-madre" placeholder="correo.vinculado@gmail.com" required>
+                                <datalist id="lista-correos-madre"></datalist>
                             </div>
-                            
-                            <div class="input-icon-wrapper mb-2" id="grupo-correo-personal" style="display: none;">
-                                <i class="fa-brands fa-spotify" style="color: #1DB954;"></i>
+
+                            <div class="input-icon-wrapper mb-2" id="grupo-correo-personal" style="display:none">
+                                <i class="fa-brands fa-spotify" style="color:#1DB954"></i>
                                 <input type="email" id="cliente-correo-personal" placeholder="Correo personal del cliente (Solo Spotify)">
                             </div>
 
@@ -474,10 +622,11 @@
                                 <input type="text" id="cliente-contrasena" placeholder="Contraseña o PIN del perfil">
                             </div>
 
-                            <div class="input-icon-wrapper" id="grupo-enlace-iptv" style="display: none;">
-                                <i class="fa-solid fa-link" style="color: #14B8A6;"></i>
+                            <div class="input-icon-wrapper" id="grupo-enlace-iptv" style="display:none">
+                                <i class="fa-solid fa-link" style="color:#14B8A6"></i>
                                 <input type="url" id="cliente-enlace" placeholder="Enlace de la lista IPTV / App">
                             </div>
+                            <p class="hint" id="hint-clave-madre" style="display:none"><i class="fa-solid fa-circle-info"></i> Contraseña tomada de la Cuenta Madre.</p>
                         </div>
 
                         <button class="btn-primario btn-wa-submit" type="submit">
@@ -488,18 +637,18 @@
             </div>
         </div>
 
-        <!-- MODAL PAGO/RENOVAR -->
+        <!-- MODAL PAGO / RENOVAR -->
         <div class="modal-overlay modal-oculto z-alto" id="modal-pago">
             <div class="modal-box modal-box--success">
                 <div class="modal-box__success-icon"><i class="fa-solid fa-circle-check"></i></div>
                 <h3 class="modal-box__title">¿Registrar Pago?</h3>
                 <p class="modal-box__text">El cliente pasará a estado "Al Día" y se anotará el ingreso en tu reporte mensual.</p>
-                
-                <div style="margin: 20px 0; text-align: left; background: #F9FAFB; padding: 15px; border-radius: 10px; border: 1px solid #E5E7EB;">
-                    <label style="font-size: 0.85rem; font-weight: 700; color: #374151; margin-bottom: 8px; display: block;">Tiempo a renovar:</label>
-                    <div style="position: relative; width: 100%;">
-                        <i class="fa-solid fa-calendar-plus" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #6B7280;"></i>
-                        <select id="pago-duracion" style="width: 100%; padding: 10px 10px 10px 40px; border-radius: 8px; border: 1px solid #D1D5DB; outline: none; font-family: inherit; font-size: 0.95rem; background: white; color: #1F2937;">
+
+                <div class="box-field">
+                    <label for="pago-duracion">Tiempo a renovar</label>
+                    <div class="input-icon-wrapper">
+                        <i class="fa-solid fa-calendar-plus"></i>
+                        <select id="pago-duracion">
                             <option value="1m">1 Mes (28 Días)</option>
                             <option value="3m">3 Meses</option>
                             <option value="6m">6 Meses</option>
@@ -515,55 +664,19 @@
             </div>
         </div>
 
-        <!-- MODAL EDITAR CUENTA MADRE -->
-        <div class="modal-overlay modal-oculto z-alto" id="modal-editar-cuenta">
-            <div class="modal-box">
-                <div class="modal-box__header">
-                    <div>
-                        <h3 class="modal-title">Editar Cuenta Madre</h3>
-                        <p class="correo-ref">Actualiza los datos de acceso</p>
-                    </div>
-                    <button class="btn-cerrar-modal" id="cerrar-modal-editar-cuenta" type="button"><i class="fa-solid fa-xmark"></i></button>
-                </div>
-                <div class="modal-box__body">
-                    <form id="form-editar-cuenta" class="form-grid">
-                        <input type="hidden" id="edit-cuenta-id">
-                        
-                        <div class="form-group">
-                            <label>Correo Principal</label>
-                            <div class="input-icon-wrapper">
-                                <i class="fa-solid fa-envelope"></i>
-                                <input type="email" id="edit-cuenta-correo" placeholder="nuevo.correo@gmail.com" required>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Fecha de Vencimiento</label>
-                            <div class="input-icon-wrapper">
-                                <i class="fa-regular fa-calendar-days"></i>
-                                <input type="date" id="edit-cuenta-vencimiento" required>
-                            </div>
-                        </div>
-
-                        <button type="submit" class="btn-primario btn-full-mt">Guardar Cambios</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <!-- MODAL NOTIFICACIÓN MASIVA EN CADENA -->
+        <!-- MODAL NOTIFICACIÓN MASIVA -->
         <div class="modal-overlay modal-oculto z-alto" id="modal-notificacion-masiva">
             <div class="modal-box box-wide">
                 <div class="modal-box__header">
                     <div>
                         <h3 class="modal-title">Notificar Cambio</h3>
-                        <p class="correo-ref">Clientes afectados por el cambio de correo</p>
+                        <p class="correo-ref">Clientes afectados por el cambio de datos</p>
                     </div>
                     <button class="btn-cerrar-modal" id="cerrar-modal-notificacion" type="button"><i class="fa-solid fa-xmark"></i></button>
                 </div>
                 <div class="modal-box__body">
-                    <p style="font-size: 0.85rem; color: #6B7280; margin-bottom: 15px;">Se actualizó el correo. Haz clic en "Notificar" para enviar los nuevos datos a los clientes vinculados.</p>
-                    <div id="lista-clientes-notificar" style="display: flex; flex-direction: column; gap: 10px;"></div>
+                    <p class="hint" id="texto-notificacion-masiva" style="margin-top:0"></p>
+                    <div id="lista-clientes-notificar" class="notify-list"></div>
                 </div>
             </div>
         </div>
@@ -593,25 +706,8 @@
             <span class="text">Ajustes</span>
         </a>
     </nav>
-    
-    <div id="toast-container" class="toast-container"></div>
 
-    <!-- VISTA CONFIGURACIÓN -->
-    <div id="vista-configuracion" class="vista-seccion vista-oculta">
-        <div class="top-section" style="text-align: center; margin-bottom: 30px;">
-            <h1>Ajustes de Costos</h1>
-            <p class="subtitle">Configura cuánto pagas al proveedor por cada Cuenta Madre</p>
-        </div>
-        
-        <div class="plat-card" style="max-width: 850px; margin: 0 auto; padding: 30px;">
-            <div id="contenedor-costos" class="form-grid">
-                <!-- Se generan desde JavaScript -->
-            </div>
-            <button id="btn-guardar-costos" class="btn-primario btn-full-mt" style="margin-top: 25px; padding: 15px; font-size: 1rem;">
-                <i class="fa-solid fa-floppy-disk"></i> Guardar Costos
-            </button>
-        </div>
-    </div>
+    <div id="toast-container" class="toast-container"></div>
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
